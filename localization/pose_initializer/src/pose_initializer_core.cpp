@@ -73,8 +73,11 @@ PoseInitializer::PoseInitializer()
   initial_pose_sub_ = this->create_subscription<geometry_msgs::msg::PoseWithCovarianceStamped>(
     "initialpose", 10,
     std::bind(&PoseInitializer::callbackInitialPose, this, std::placeholders::_1));
-  map_points_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
-    "pointcloud_map", rclcpp::QoS{1}.transient_local(),
+  // map_points_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
+  //   "pointcloud_map", rclcpp::QoS{1}.transient_local(),
+  //   std::bind(&PoseInitializer::callbackMapPoints, this, std::placeholders::_1));
+  map_points_sub_ = this->create_subscription<autoware_map_msgs::msg::PCDMapArray>(
+    "pointcloud_map", rclcpp::QoS{1},
     std::bind(&PoseInitializer::callbackMapPoints, this, std::placeholders::_1));
   gnss_pose_sub_ = this->create_subscription<geometry_msgs::msg::PoseWithCovarianceStamped>(
     "gnss_pose_cov", 1,
@@ -96,7 +99,7 @@ PoseInitializer::PoseInitializer()
   }
 
   pcd_loader_service_group_ = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
-  pcd_loader_client_ = this->create_client<autoware_map_srvs::srv::LoadPCDPartiallyForPublish>(
+  pcd_loader_client_ = this->create_client<autoware_map_msgs::srv::LoadPCDPartiallyForPublish>(
     "pcd_loader_service", rmw_qos_profile_services_default, pcd_loader_service_group_);
   while (!pcd_loader_client_->wait_for_service(std::chrono::seconds(1)) && rclcpp::ok()) {
     RCLCPP_INFO(get_logger(), "Waiting for pcd loader service...");
@@ -115,12 +118,32 @@ PoseInitializer::PoseInitializer()
                                         std::placeholders::_1, std::placeholders::_2));
 }
 
+// void PoseInitializer::callbackMapPoints(
+//   sensor_msgs::msg::PointCloud2::ConstSharedPtr map_points_msg_ptr)
+// {
+//   std::string map_frame_ = map_points_msg_ptr->header.frame_id;
+//   map_ptr_ = pcl::PointCloud<pcl::PointXYZ>::Ptr(new pcl::PointCloud<pcl::PointXYZ>);
+//   pcl::fromROSMsg(*map_points_msg_ptr, *map_ptr_);
+// }
+
 void PoseInitializer::callbackMapPoints(
-  sensor_msgs::msg::PointCloud2::ConstSharedPtr map_points_msg_ptr)
+  autoware_map_msgs::msg::PCDMapArray::ConstSharedPtr map_points_msg_ptr)
 {
-  std::string map_frame_ = map_points_msg_ptr->header.frame_id;
+  RCLCPP_INFO(this->get_logger(), "Received a map! size: %d", int(map_points_msg_ptr->pcd_maps.size()));
+  std::string map_frame_ = map_points_msg_ptr->pcd_maps[0].pcd_map.header.frame_id;
+  sensor_msgs::msg::PointCloud2 pcd_msg;
+  for (const auto & pcd_info : map_points_msg_ptr->pcd_maps) {
+    if (pcd_msg.width == 0) {
+      pcd_msg = pcd_info.pcd_map;
+    } else {
+      pcd_msg.width += pcd_info.pcd_map.width;
+      pcd_msg.row_step += pcd_info.pcd_map.row_step;
+      pcd_msg.data.insert(pcd_msg.data.end(),
+        pcd_info.pcd_map.data.begin(), pcd_info.pcd_map.data.end());
+    }
+  }
   map_ptr_ = pcl::PointCloud<pcl::PointXYZ>::Ptr(new pcl::PointCloud<pcl::PointXYZ>);
-  pcl::fromROSMsg(*map_points_msg_ptr, *map_ptr_);
+  pcl::fromROSMsg(pcd_msg, *map_ptr_);
 }
 
 void PoseInitializer::serviceInitializePose(
@@ -152,12 +175,12 @@ void PoseInitializer::callbackInitialPose(
   } catch (tf2::TransformException & exception) {
     RCLCPP_WARN_STREAM(get_logger(), "failed to lookup transform: " << exception.what());
   }
-  auto request = std::make_shared<autoware_map_srvs::srv::LoadPCDPartiallyForPublish::Request>();
+  auto request = std::make_shared<autoware_map_msgs::srv::LoadPCDPartiallyForPublish::Request>();
   request->position = add_height_pose_msg_ptr->pose.pose.position;
   request->radius = radius_to_load_map_;  // Should be removed somehow
   auto result{pcd_loader_client_->async_send_request(
     request,
-    [this](const rclcpp::Client<autoware_map_srvs::srv::LoadPCDPartiallyForPublish>::SharedFuture
+    [this](const rclcpp::Client<autoware_map_msgs::srv::LoadPCDPartiallyForPublish>::SharedFuture
              response) {
       (void)response;
       std::lock_guard<std::mutex> lock{mutex_};
@@ -195,12 +218,12 @@ void PoseInitializer::callbackGNSSPoseCov(
     RCLCPP_WARN_STREAM(get_logger(), "failed to lookup transform: " << exception.what());
   }
 
-  auto request = std::make_shared<autoware_map_srvs::srv::LoadPCDPartiallyForPublish::Request>();
+  auto request = std::make_shared<autoware_map_msgs::srv::LoadPCDPartiallyForPublish::Request>();
   request->position = add_height_pose_msg_ptr->pose.pose.position;
   request->radius = radius_to_load_map_;  // Should be removed somehow
   auto result{pcd_loader_client_->async_send_request(
     request,
-    [this](const rclcpp::Client<autoware_map_srvs::srv::LoadPCDPartiallyForPublish>::SharedFuture
+    [this](const rclcpp::Client<autoware_map_msgs::srv::LoadPCDPartiallyForPublish>::SharedFuture
              response) {
       (void)response;
       std::lock_guard<std::mutex> lock{mutex_};

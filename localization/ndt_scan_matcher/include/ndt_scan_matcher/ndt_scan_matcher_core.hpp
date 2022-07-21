@@ -20,6 +20,7 @@
 #include "ndt_scan_matcher/particle.hpp"
 
 #include <ndt/omp.hpp>
+#include <ndt/omp_multi_voxel.hpp>
 #include <ndt/pcl_generic.hpp>
 #include <ndt/pcl_modified.hpp>
 #include <rclcpp/rclcpp.hpp>
@@ -33,6 +34,7 @@
 #include <sensor_msgs/point_cloud2_iterator.hpp>
 #include <tier4_debug_msgs/msg/float32_stamped.hpp>
 #include <tier4_debug_msgs/msg/int32_stamped.hpp>
+#include <autoware_map_msgs/msg/pcd_map_array.hpp>
 #include <tier4_localization_msgs/srv/pose_with_covariance_stamped.hpp>
 #include <visualization_msgs/msg/marker_array.hpp>
 
@@ -64,7 +66,7 @@
 #include <thread>
 #include <vector>
 
-enum class NDTImplementType { PCL_GENERIC = 0, PCL_MODIFIED = 1, OMP = 2 };
+enum class NDTImplementType { PCL_GENERIC = 0, PCL_MODIFIED = 1, OMP = 2, OMP_MULTI_VOXEL = 3 };
 enum class ConvergedParamType {
   TRANSFORM_PROBABILITY = 0,
   NEAREST_VOXEL_TRANSFORMATION_LIKELIHOOD = 1
@@ -87,7 +89,10 @@ std::shared_ptr<NormalDistributionsTransformBase<PointSource, PointTarget>> getN
     ndt_ptr.reset(new NormalDistributionsTransformOMP<PointSource, PointTarget>);
     return ndt_ptr;
   }
-
+  if (ndt_mode == NDTImplementType::OMP_MULTI_VOXEL) {
+    ndt_ptr.reset(new NormalDistributionsTransformOMPMultiVoxel<PointSource, PointTarget>);
+    return ndt_ptr;
+  }
   const std::string s = fmt::format("Unknown NDT type {}", static_cast<int>(ndt_mode));
   throw std::runtime_error(s);
 }
@@ -113,7 +118,8 @@ private:
     const tier4_localization_msgs::srv::PoseWithCovarianceStamped::Request::SharedPtr req,
     tier4_localization_msgs::srv::PoseWithCovarianceStamped::Response::SharedPtr res);
 
-  void callbackMapPoints(sensor_msgs::msg::PointCloud2::ConstSharedPtr pointcloud2_msg_ptr);
+  // void callbackMapPoints(sensor_msgs::msg::PointCloud2::ConstSharedPtr pointcloud2_msg_ptr);
+  void callbackMapPoints(autoware_map_msgs::msg::PCDMapArray::ConstSharedPtr pcd_map_array_msg_ptr);
   void callbackSensorPoints(sensor_msgs::msg::PointCloud2::ConstSharedPtr pointcloud2_msg_ptr);
   void callbackInitialPose(
     geometry_msgs::msg::PoseWithCovarianceStamped::ConstSharedPtr pose_conv_msg_ptr);
@@ -145,8 +151,12 @@ private:
   void timerDiagnostic();
   bool validateInitialPositionCompatibility(const geometry_msgs::msg::Point & initial_point);
 
+  // void publishPartialPCDMap(
+  //   const autoware_map_msgs::msg::PCDMapArray::SharedPtr pcd_map_array_msg_ptr);
+
   rclcpp::Subscription<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr initial_pose_sub_;
-  rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr map_points_sub_;
+  // rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr map_points_sub_;
+  rclcpp::Subscription<autoware_map_msgs::msg::PCDMapArray>::SharedPtr map_points_sub_;
   rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr sensor_points_sub_;
   rclcpp::Subscription<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr
     regularization_pose_sub_;
@@ -172,6 +182,8 @@ private:
   rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr
     ndt_monte_carlo_initial_pose_marker_pub_;
   rclcpp::Publisher<diagnostic_msgs::msg::DiagnosticArray>::SharedPtr diagnostics_pub_;
+
+  rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr koji_map_pub_;
 
   rclcpp::Service<tier4_localization_msgs::srv::PoseWithCovarianceStamped>::SharedPtr service_;
 

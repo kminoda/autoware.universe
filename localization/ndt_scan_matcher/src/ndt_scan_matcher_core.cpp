@@ -230,7 +230,10 @@ NDTScanMatcher::NDTScanMatcher()
     "ekf_pose_with_covariance", 100,
     std::bind(&NDTScanMatcher::callbackInitialPose, this, std::placeholders::_1),
     initial_pose_sub_opt);
-  map_points_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
+  // map_points_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
+  //   "pointcloud_map", rclcpp::QoS{1},
+  //   std::bind(&NDTScanMatcher::callbackMapPoints, this, std::placeholders::_1), map_sub_opt);
+  map_points_sub_ = this->create_subscription<autoware_map_msgs::msg::PCDMapArray>(
     "pointcloud_map", rclcpp::QoS{1},
     std::bind(&NDTScanMatcher::callbackMapPoints, this, std::placeholders::_1), map_sub_opt);
   sensor_points_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
@@ -273,6 +276,9 @@ NDTScanMatcher::NDTScanMatcher()
 
   diagnostics_pub_ =
     this->create_publisher<diagnostic_msgs::msg::DiagnosticArray>("/diagnostics", 10);
+
+  koji_map_pub_ =
+    this->create_publisher<sensor_msgs::msg::PointCloud2>("/map/pointcloud_map/koji", rclcpp::QoS{1}.transient_local());
 
   service_ = this->create_service<tier4_localization_msgs::srv::PoseWithCovarianceStamped>(
     "ndt_align_srv",
@@ -413,30 +419,36 @@ void NDTScanMatcher::callbackRegularizationPose(
   regularization_pose_msg_ptr_array_.push_back(pose_conv_msg_ptr);
 }
 
+// void NDTScanMatcher::callbackMapPoints(
+//   sensor_msgs::msg::PointCloud2::ConstSharedPtr map_points_msg_ptr)
 void NDTScanMatcher::callbackMapPoints(
-  sensor_msgs::msg::PointCloud2::ConstSharedPtr map_points_msg_ptr)
+  autoware_map_msgs::msg::PCDMapArray::ConstSharedPtr pcd_map_array_msg_ptr)
 {
-  sensor_msgs::PointCloud2ConstIterator<float> iter_x(*map_points_msg_ptr, "x");
-  sensor_msgs::PointCloud2ConstIterator<float> iter_y(*map_points_msg_ptr, "y");
-  double new_min_x = *iter_x;
-  double new_min_y = *iter_y;
-  double new_max_x = *iter_x;
-  double new_max_y = *iter_y;
-  while (iter_x != iter_x.end()) {
-    if (new_min_x > *iter_x) {
-      new_min_x = *iter_x;
+  std::cout << "Received a map! size = " << int(pcd_map_array_msg_ptr->pcd_maps.size()) << std::endl;
+
+  double new_min_x = std::numeric_limits<double>::max();
+  double new_min_y = std::numeric_limits<double>::max();
+  double new_max_x = std::numeric_limits<double>::min();
+  double new_max_y = std::numeric_limits<double>::min();
+  for (const auto & pcd_map_info: pcd_map_array_msg_ptr->pcd_maps) {
+    sensor_msgs::PointCloud2ConstIterator<float> iter_x(pcd_map_info.pcd_map, "x");
+    sensor_msgs::PointCloud2ConstIterator<float> iter_y(pcd_map_info.pcd_map, "y");
+    while (iter_x != iter_x.end()) {
+      if (new_min_x > *iter_x) {
+        new_min_x = *iter_x;
+      }
+      if (new_min_y > *iter_y) {
+        new_min_y = *iter_y;
+      }
+      if (new_max_x < *iter_x) {
+        new_max_x = *iter_x;
+      }
+      if (new_max_y < *iter_y) {
+        new_max_y = *iter_y;
+      }
+      ++iter_x;
+      ++iter_y;
     }
-    if (new_min_y > *iter_y) {
-      new_min_y = *iter_y;
-    }
-    if (new_max_x < *iter_x) {
-      new_max_x = *iter_x;
-    }
-    if (new_max_y < *iter_y) {
-      new_max_y = *iter_y;
-    }
-    ++iter_x;
-    ++iter_y;
   }
 
   const auto KOJI_exe_start_time = std::chrono::system_clock::now();
@@ -449,27 +461,29 @@ void NDTScanMatcher::callbackMapPoints(
   using NDTBase = NormalDistributionsTransformBase<PointSource, PointTarget>;
   std::shared_ptr<NDTBase> new_ndt_ptr = getNDT<PointSource, PointTarget>(ndt_implement_type_);
 
-  if (ndt_implement_type_ == NDTImplementType::OMP) {
-    using T = NormalDistributionsTransformOMP<PointSource, PointTarget>;
-
-    // FIXME(IshitaTakeshi) Not sure if this is safe
-    std::shared_ptr<T> ndt_omp_ptr = std::dynamic_pointer_cast<T>(new_ndt_ptr);
-    ndt_omp_ptr->setNeighborhoodSearchMethod(omp_params_.search_method);
-    ndt_omp_ptr->setNumThreads(omp_params_.num_threads);
-  }
   new_ndt_ptr->setTransformationEpsilon(trans_epsilon);
   new_ndt_ptr->setStepSize(step_size);
   new_ndt_ptr->setResolution(resolution);
   new_ndt_ptr->setMaximumIterations(max_iterations);
   new_ndt_ptr->setRegularizationScaleFactor(regularization_scale_factor_);
 
-  pcl::shared_ptr<pcl::PointCloud<PointTarget>> map_points_ptr(new pcl::PointCloud<PointTarget>);
-  pcl::fromROSMsg(*map_points_msg_ptr, *map_points_ptr);
-  new_ndt_ptr->setInputTarget(map_points_ptr);
+  if (ndt_implement_type_ == NDTImplementType::OMP_MULTI_VOXEL) {
+    using T = NormalDistributionsTransformOMPMultiVoxel<PointSource, PointTarget>;
+    std::shared_ptr<T> ndt_omp_ptr = std::dynamic_pointer_cast<T>(new_ndt_ptr);
+    std::cout << "Start filtering maps. Size = " << int(pcd_map_array_msg_ptr->pcd_maps.size()) << std::endl;
+    for (const auto & pcd_map_info: pcd_map_array_msg_ptr->pcd_maps) {
+      std::cout << "Filtering map: " << pcd_map_info.map_id << std::endl;
+      pcl::shared_ptr<pcl::PointCloud<PointTarget>> map_points_ptr(new pcl::PointCloud<PointTarget>);
+      pcl::fromROSMsg(pcd_map_info.pcd_map, *map_points_ptr);
+      ndt_omp_ptr->setInputTarget(map_points_ptr, pcd_map_info.map_id);
+    }
+    std::cout << "Start creating kdtree for the voxels" << std::endl;
+    ndt_omp_ptr->createVoxelKdtree();
+  }
 
   auto output_cloud = std::make_shared<pcl::PointCloud<PointSource>>();
-  // new_ndt_ptr->align(
-  //   *output_cloud, Eigen::Matrix4f::Identity());  // No longer necessary for ndt_omp
+  new_ndt_ptr->align(
+    *output_cloud, Eigen::Matrix4f::Identity());  // No longer necessary for ndt_omp
 
   const auto KOJI_exe_end_time = std::chrono::system_clock::now();
   const double KOJI_exe_time =
@@ -489,7 +503,27 @@ void NDTScanMatcher::callbackMapPoints(
   max_y_ = new_max_y;
 
   ndt_map_mtx_.unlock();
+
+  // publishPartialPCDMap(pcd_map_array_msg_ptr);
 }
+
+
+// void NDTScanMatcher::publishPartialPCDMap(
+//   const autoware_map_msgs::msg::PCDMapArray::SharedPtr pcd_map_array_msg_ptr)
+// {
+//   sensor_msgs::msg::PointCloud2 pcd_msg;
+//   for (const auto & pcd_info : pcd_map_array_msg_ptr->pcd_maps) {
+//     if (pcd_msg.width == 0) {
+//       pcd_msg = pcd_info.pcd_map;
+//     } else {
+//       pcd_msg.width += pcd_info.pcd_map.width;
+//       pcd_msg.row_step += pcd_info.pcd_map.row_step;
+//       pcd_msg.data.insert(pcd_msg.data.end(),
+//         pcd_info.pcd_map.data.begin(), pcd_info.pcd_map.data.end());
+//     }
+//   }
+//   koji_map_pub_->publish(pcd_msg);
+// }
 
 void NDTScanMatcher::callbackSensorPoints(
   sensor_msgs::msg::PointCloud2::ConstSharedPtr sensor_points_sensorTF_msg_ptr)
@@ -625,6 +659,10 @@ void NDTScanMatcher::callbackSensorPoints(
       "%d",
       iteration_num, ndt_ptr_->getMaximumIterations() + 2);
   }
+  RCLCPP_WARN(
+    get_logger(),
+    "The number of iterations OK. The number of iterations: %d",
+    iteration_num);
 
   bool is_local_optimal_solution_oscillation = false;
   if (!is_ok_iteration_num) {

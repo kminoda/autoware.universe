@@ -11,6 +11,7 @@
   <depend>map_loader</depend>
   <depend>rclcpp</depend>
   <depend>sensor_msgs</depend>
+  <depend>autoware_map_msgs</depend>
   <depend>tf2_ros</depend>
   <build_depend>autoware_cmake</build_depend>
 

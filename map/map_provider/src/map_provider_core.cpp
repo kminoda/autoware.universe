@@ -34,11 +34,11 @@ MapProvider::MapProvider() : Node("map_provider"), tf2_listener_(tf2_buffer_)
   pointcloud_map_radius_ = this->declare_parameter("pointcloud_map_radius", 50.0);
   update_threshold_distance_ = this->declare_parameter("update_threshold_distance", 100.0);
 
-  map_points_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>(
-    "output/pointcloud_map", rclcpp::QoS(1).transient_local());
+  // map_points_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>(
+  //   "output/pointcloud_map", rclcpp::QoS(1).transient_local());
 
   pcd_loader_service_group_ = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
-  pcd_loader_client_ = this->create_client<autoware_map_srvs::srv::LoadPCDPartially>(
+  pcd_loader_client_ = this->create_client<autoware_map_msgs::srv::LoadPCDPartiallyForPublish>(
     "pcd_loader_service", rmw_qos_profile_services_default, pcd_loader_service_group_);
   while (!pcd_loader_client_->wait_for_service(std::chrono::seconds(1)) && rclcpp::ok()) {
     RCLCPP_DEBUG(get_logger(), "Waiting for pcd_loader_service...");
@@ -74,14 +74,14 @@ void MapProvider::updateMapTimerCallback()
   }
 
   // update map
-  auto request = std::make_shared<autoware_map_srvs::srv::LoadPCDPartially::Request>();
+  auto request = std::make_shared<autoware_map_msgs::srv::LoadPCDPartiallyForPublish::Request>();
   request->position.x = transform_stamped.transform.translation.x;
   request->position.y = transform_stamped.transform.translation.y;
   request->position.z = transform_stamped.transform.translation.z;
   request->radius = pointcloud_map_radius_;
   auto result{pcd_loader_client_->async_send_request(
     request,
-    [this](const rclcpp::Client<autoware_map_srvs::srv::LoadPCDPartially>::SharedFuture response) {
+    [this](const rclcpp::Client<autoware_map_msgs::srv::LoadPCDPartiallyForPublish>::SharedFuture response) {
       (void)response;
       std::lock_guard<std::mutex> lock{mutex_};
       value_ready_ = true;
@@ -92,14 +92,14 @@ void MapProvider::updateMapTimerCallback()
   // TODO: This may be wrong. Maybe must return when failed to call pcd_loader_ server? (koji
   // minoda)
 
-  pcd_loader_res_ = result.get();
+  // pcd_loader_res_ = result.get();
 
-  if (pcd_loader_res_->map.width == 0) {
-    RCLCPP_ERROR(
-      get_logger(), "No Map! pos=%lf, %lf %lf", request->position.x, request->position.y,
-      request->position.z);
-    return;
-  }
+  // if (pcd_loader_res_->map.width == 0) {
+  //   RCLCPP_ERROR(
+  //     get_logger(), "No Map! pos=%lf, %lf %lf", request->position.x, request->position.y,
+  //     request->position.z);
+  //   return;
+  // }
 
-  map_points_pub_->publish(pcd_loader_res_->map);
+  // map_points_pub_->publish(pcd_loader_res_->map);
 }

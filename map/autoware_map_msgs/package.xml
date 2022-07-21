@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <package format="3">
-  <name>autoware_map_srvs</name>
+  <name>autoware_map_msgs</name>
   <version>0.0.0</version>
-  <description>The autoware_map_srvs package</description>
+  <description>The autoware_map_msgs package</description>
   <maintainer email="rottertarmenation.y11.r18@gmail.com">RyuYamamoto</maintainer>
   <license>MIT</license>
 
@@ -11,6 +11,7 @@
   <depend>rclcpp</depend>
   <depend>sensor_msgs</depend>
   <depend>std_msgs</depend>
+  <depend>tier4_map_msgs</depend>
 
   <exec_depend>rosidl_default_runtime</exec_depend>
 

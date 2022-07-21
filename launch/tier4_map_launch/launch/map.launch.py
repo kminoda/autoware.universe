@@ -176,6 +176,6 @@ def generate_launch_description():
             set_container_executable,
             set_container_mt_executable,
         ]
-        + [get_map_provider()]
+        # + [get_map_provider()]
         + [OpaqueFunction(function=launch_setup)]
     )

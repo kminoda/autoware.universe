@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.5)
-project(autoware_map_srvs)
+project(autoware_map_msgs)
 
 if(NOT CMAKE_CXX_STANDARD)
   set(CMAKE_CXX_STANDARD 14)
@@ -16,12 +16,15 @@ find_package(PCL REQUIRED)
 ament_auto_find_build_dependencies()
 
 rosidl_generate_interfaces(${PROJECT_NAME}
+  "msg/PCDMap.msg"
+  "msg/PCDMapArray.msg"
   "srv/LoadPCDPartially.srv"
   "srv/LoadPCDPartiallyForPublish.srv"
   DEPENDENCIES
     std_msgs
     geometry_msgs
     sensor_msgs
+    tier4_map_msgs
 )
 
 if(BUILD_TESTING)

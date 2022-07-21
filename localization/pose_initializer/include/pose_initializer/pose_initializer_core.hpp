@@ -15,7 +15,8 @@
 #ifndef POSE_INITIALIZER__POSE_INITIALIZER_CORE_HPP_
 #define POSE_INITIALIZER__POSE_INITIALIZER_CORE_HPP_
 
-#include "autoware_map_srvs/srv/load_pcd_partially_for_publish.hpp"
+#include "autoware_map_msgs/srv/load_pcd_partially_for_publish.hpp"
+#include "autoware_map_msgs/msg/pcd_map_array.hpp"
 
 #include <rclcpp/rclcpp.hpp>
 #include <tier4_api_utils/tier4_api_utils.hpp>
@@ -42,7 +43,8 @@ public:
   PoseInitializer();
 
 private:
-  void callbackMapPoints(sensor_msgs::msg::PointCloud2::ConstSharedPtr map_points_msg_ptr);
+  // void callbackMapPoints(sensor_msgs::msg::PointCloud2::ConstSharedPtr map_points_msg_ptr);
+  void callbackMapPoints(autoware_map_msgs::msg::PCDMapArray::ConstSharedPtr map_points_msg_ptr);
   void serviceInitializePose(
     const tier4_localization_msgs::srv::PoseWithCovarianceStamped::Request::SharedPtr req,
     tier4_localization_msgs::srv::PoseWithCovarianceStamped::Response::SharedPtr res);
@@ -57,7 +59,7 @@ private:
     const tier4_localization_msgs::msg::PoseInitializationRequest::ConstSharedPtr
       request_msg_ptr);  // NOLINT
   // void serviceResponseCallback(
-  //   rclcpp::Client<autoware_map_srvs::srv::LoadPCDPartiallyForPublish>::SharedFuture future);
+  //   rclcpp::Client<autoware_map_msgs::srv::LoadPCDPartiallyForPublish>::SharedFuture future);
 
   bool getHeight(
     const geometry_msgs::msg::PoseWithCovarianceStamped & input_pose_msg,
@@ -66,7 +68,8 @@ private:
     const geometry_msgs::msg::PoseWithCovarianceStamped::SharedPtr msg);
 
   rclcpp::Subscription<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr gnss_pose_sub_;
-  rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr map_points_sub_;
+  // rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr map_points_sub_;
+  rclcpp::Subscription<autoware_map_msgs::msg::PCDMapArray>::SharedPtr map_points_sub_;
 
   // TODO(Takagi, Isamu): deprecated
   rclcpp::Subscription<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr initial_pose_sub_;
@@ -76,7 +79,7 @@ private:
   rclcpp::Publisher<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr initial_pose_pub_;
 
   rclcpp::Client<tier4_localization_msgs::srv::PoseWithCovarianceStamped>::SharedPtr ndt_client_;
-  rclcpp::Client<autoware_map_srvs::srv::LoadPCDPartiallyForPublish>::SharedPtr pcd_loader_client_;
+  rclcpp::Client<autoware_map_msgs::srv::LoadPCDPartiallyForPublish>::SharedPtr pcd_loader_client_;
 
   rclcpp::CallbackGroup::SharedPtr initialize_pose_service_group_;
   rclcpp::CallbackGroup::SharedPtr pcd_loader_service_group_;
