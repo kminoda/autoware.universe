@@ -177,7 +177,7 @@ NDTScanMatcher::NDTScanMatcher()
   int converged_param_type_tmp = this->declare_parameter("converged_param_type", 0);
   converged_param_type_ = static_cast<ConvergedParamType>(converged_param_type_tmp);
   if (
-    ndt_implement_type_ != NDTImplementType::OMP &&
+    ndt_implement_type_ != NDTImplementType::OMP_MULTI_VOXEL &&
     converged_param_type_ == ConvergedParamType::NEAREST_VOXEL_TRANSFORMATION_LIKELIHOOD) {
     RCLCPP_ERROR(
       get_logger(),
@@ -659,10 +659,10 @@ void NDTScanMatcher::callbackSensorPoints(
       "%d",
       iteration_num, ndt_ptr_->getMaximumIterations() + 2);
   }
-  RCLCPP_WARN(
-    get_logger(),
-    "The number of iterations OK. The number of iterations: %d",
-    iteration_num);
+  // RCLCPP_WARN(
+  //   get_logger(),
+  //   "The number of iterations OK. The number of iterations: %d",
+  //   iteration_num);
 
   bool is_local_optimal_solution_oscillation = false;
   if (!is_ok_iteration_num) {

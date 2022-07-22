@@ -24,7 +24,6 @@ rosidl_generate_interfaces(${PROJECT_NAME}
     std_msgs
     geometry_msgs
     sensor_msgs
-    tier4_map_msgs
 )
 
 if(BUILD_TESTING)
