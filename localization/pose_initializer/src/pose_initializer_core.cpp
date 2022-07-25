@@ -116,6 +116,8 @@ PoseInitializer::PoseInitializer()
       "service/initialize_pose_auto", std::bind(
                                         &PoseInitializer::serviceInitializePoseAuto, this,
                                         std::placeholders::_1, std::placeholders::_2));
+
+  map_ptr_ = nullptr;
 }
 
 // void PoseInitializer::callbackMapPoints(
@@ -129,6 +131,8 @@ PoseInitializer::PoseInitializer()
 void PoseInitializer::callbackMapPoints(
   autoware_map_msgs::msg::PCDMapArray::ConstSharedPtr map_points_msg_ptr)
 {
+  if (map_ptr_ != nullptr) {return;} // TODO: koji minoda
+
   RCLCPP_INFO(this->get_logger(), "Received a map! size: %d", int(map_points_msg_ptr->pcd_maps.size()));
   std::string map_frame_ = map_points_msg_ptr->pcd_maps[0].pcd_map.header.frame_id;
   sensor_msgs::msg::PointCloud2 pcd_msg;
