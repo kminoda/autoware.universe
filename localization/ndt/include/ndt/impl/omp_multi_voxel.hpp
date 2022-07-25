@@ -240,6 +240,13 @@ int NormalDistributionsTransformOMPMultiVoxel<PointSource, PointTarget>::getNumT
   return ndt_ptr_->getNumThreads();
 }
 
+template <class PointSource, class PointTarget>
+void NormalDistributionsTransformOMPMultiVoxel<PointSource, PointTarget>::getVoxelPCD(
+  pcl::PointCloud<PointTarget> & output)
+{
+  ndt_ptr_->getVoxelPCD(output);
+}
+
 // template <class PointSource, class PointTarget>
 // pclomp::NeighborSearchMethod
 // NormalDistributionsTransformOMPMultiVoxel<PointSource, PointTarget>::getNeighborhoodSearchMethod() const

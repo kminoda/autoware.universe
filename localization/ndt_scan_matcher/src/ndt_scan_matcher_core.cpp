@@ -36,6 +36,14 @@
 #include <iomanip>
 #include <thread>
 
+// template <typename T>
+// void swap(T& a, T& a)
+// {
+//     T temp = a;
+//     a = b;
+//     b = temp;
+// }
+
 tier4_debug_msgs::msg::Float32Stamped makeFloat32Stamped(
   const builtin_interfaces::msg::Time & stamp, const float data)
 {
@@ -125,22 +133,18 @@ NDTScanMatcher::NDTScanMatcher()
   RCLCPP_INFO(get_logger(), "NDT Implement Type is %d", ndt_implement_type_tmp);
   try {
     ndt_ptr_ = getNDT<PointSource, PointTarget>(ndt_implement_type_);
+    backup_ndt_ptr_ = getNDT<PointSource, PointTarget>(ndt_implement_type_);
   } catch (std::exception & e) {
     RCLCPP_ERROR(get_logger(), "%s", e.what());
     return;
   }
 
   if (ndt_implement_type_ == NDTImplementType::OMP) {
-    using T = NormalDistributionsTransformOMP<PointSource, PointTarget>;
-
-    // FIXME(IshitaTakeshi) Not sure if this is safe
+    const std::string s = fmt::format("DO NOT USE OMP FOR NOW (koji minoda)");
+    throw std::runtime_error(s);
+  } else if (ndt_implement_type_ == NDTImplementType::OMP_MULTI_VOXEL) {
+    using T = NormalDistributionsTransformOMPMultiVoxel<PointSource, PointTarget>;
     std::shared_ptr<T> ndt_omp_ptr = std::dynamic_pointer_cast<T>(ndt_ptr_);
-    int search_method = static_cast<int>(omp_params_.search_method);
-    search_method = this->declare_parameter("omp_neighborhood_search_method", search_method);
-    omp_params_.search_method = static_cast<pclomp::NeighborSearchMethod>(search_method);
-    // TODO(TIER IV): check search_method is valid value.
-    ndt_omp_ptr->setNeighborhoodSearchMethod(omp_params_.search_method);
-
     omp_params_.num_threads = this->declare_parameter("omp_num_threads", omp_params_.num_threads);
     omp_params_.num_threads = std::max(omp_params_.num_threads, 1);
     ndt_omp_ptr->setNumThreads(omp_params_.num_threads);
@@ -169,6 +173,10 @@ NDTScanMatcher::NDTScanMatcher()
   ndt_ptr_->setResolution(resolution);
   ndt_ptr_->setMaximumIterations(max_iterations);
   ndt_ptr_->setRegularizationScaleFactor(regularization_scale_factor_);
+
+  copyNDT(ndt_ptr_, backup_ndt_ptr_, ndt_implement_type_);
+  // std::cout << "ADDRESS ndt_ptr_: " << ndt_ptr_ << std::endl;
+  // std::cout << "ADDRESS new_ndt_ptr: " << backup_ndt_ptr_ << std::endl;
 
   RCLCPP_INFO(
     get_logger(), "trans_epsilon: %lf, step_size: %lf, resolution: %lf, max_iterations: %d",
@@ -425,6 +433,37 @@ void NDTScanMatcher::callbackMapPoints(
   autoware_map_msgs::msg::PCDMapArray::ConstSharedPtr pcd_map_array_msg_ptr)
 {
   std::cout << "Received a map! size = " << int(pcd_map_array_msg_ptr->pcd_maps.size()) << std::endl;
+  if ((int(pcd_map_array_msg_ptr->pcd_maps.size()) == 0) & (int(pcd_map_array_msg_ptr->removing_cloud_ids.size()) == 0)) {
+    std::cout << "No map update" << std::endl;
+    return ;
+  }
+
+  const auto KOJI_exe_start_time = std::chrono::system_clock::now();
+
+  if (ndt_implement_type_ == NDTImplementType::OMP_MULTI_VOXEL) {
+    using T = NormalDistributionsTransformOMPMultiVoxel<PointSource, PointTarget>;
+    std::shared_ptr<T> backup_ndt_omp_ptr = std::dynamic_pointer_cast<T>(backup_ndt_ptr_);
+    // std::cout << "Start filtering maps. Size = " << int(pcd_map_array_msg_ptr->pcd_maps.size()) << std::endl;
+
+    // Add pcd
+    for (const auto & pcd_map_info: pcd_map_array_msg_ptr->pcd_maps) {
+      // std::cout << "Filtering map: " << pcd_map_info.map_id << std::endl;
+      pcl::shared_ptr<pcl::PointCloud<PointTarget>> map_points_ptr(new pcl::PointCloud<PointTarget>);
+      pcl::fromROSMsg(pcd_map_info.pcd_map, *map_points_ptr);
+      backup_ndt_omp_ptr->setInputTarget(map_points_ptr, pcd_map_info.map_id);
+    }
+
+    // Remove pcd
+    for (const std::string pcd_id_to_remove: pcd_map_array_msg_ptr->removing_cloud_ids) {
+      backup_ndt_omp_ptr->removeTarget(pcd_id_to_remove);
+    }
+
+    backup_ndt_omp_ptr->createVoxelKdtree();
+  }
+
+  auto output_cloud = std::make_shared<pcl::PointCloud<PointSource>>();
+  backup_ndt_ptr_->align(
+    *output_cloud, Eigen::Matrix4f::Identity());  // No longer necessary for ndt_omp
 
   double new_min_x = std::numeric_limits<double>::max();
   double new_min_y = std::numeric_limits<double>::max();
@@ -451,40 +490,6 @@ void NDTScanMatcher::callbackMapPoints(
     }
   }
 
-  const auto KOJI_exe_start_time = std::chrono::system_clock::now();
-
-  const auto trans_epsilon = ndt_ptr_->getTransformationEpsilon();
-  const auto step_size = ndt_ptr_->getStepSize();
-  const auto resolution = ndt_ptr_->getResolution();
-  const auto max_iterations = ndt_ptr_->getMaximumIterations();
-
-  using NDTBase = NormalDistributionsTransformBase<PointSource, PointTarget>;
-  std::shared_ptr<NDTBase> new_ndt_ptr = getNDT<PointSource, PointTarget>(ndt_implement_type_);
-
-  new_ndt_ptr->setTransformationEpsilon(trans_epsilon);
-  new_ndt_ptr->setStepSize(step_size);
-  new_ndt_ptr->setResolution(resolution);
-  new_ndt_ptr->setMaximumIterations(max_iterations);
-  new_ndt_ptr->setRegularizationScaleFactor(regularization_scale_factor_);
-
-  if (ndt_implement_type_ == NDTImplementType::OMP_MULTI_VOXEL) {
-    using T = NormalDistributionsTransformOMPMultiVoxel<PointSource, PointTarget>;
-    std::shared_ptr<T> ndt_omp_ptr = std::dynamic_pointer_cast<T>(new_ndt_ptr);
-    std::cout << "Start filtering maps. Size = " << int(pcd_map_array_msg_ptr->pcd_maps.size()) << std::endl;
-    for (const auto & pcd_map_info: pcd_map_array_msg_ptr->pcd_maps) {
-      std::cout << "Filtering map: " << pcd_map_info.map_id << std::endl;
-      pcl::shared_ptr<pcl::PointCloud<PointTarget>> map_points_ptr(new pcl::PointCloud<PointTarget>);
-      pcl::fromROSMsg(pcd_map_info.pcd_map, *map_points_ptr);
-      ndt_omp_ptr->setInputTarget(map_points_ptr, pcd_map_info.map_id);
-    }
-    std::cout << "Start creating kdtree for the voxels" << std::endl;
-    ndt_omp_ptr->createVoxelKdtree();
-  }
-
-  auto output_cloud = std::make_shared<pcl::PointCloud<PointSource>>();
-  new_ndt_ptr->align(
-    *output_cloud, Eigen::Matrix4f::Identity());  // No longer necessary for ndt_omp
-
   const auto KOJI_exe_end_time = std::chrono::system_clock::now();
   const double KOJI_exe_time =
     std::chrono::duration_cast<std::chrono::microseconds>(KOJI_exe_end_time - KOJI_exe_start_time)
@@ -496,34 +501,50 @@ void NDTScanMatcher::callbackMapPoints(
 
   // swap
   ndt_map_mtx_.lock();
-  ndt_ptr_ = new_ndt_ptr;
+  ndt_ptr_.swap(backup_ndt_ptr_);
   min_x_ = new_min_x;
   min_y_ = new_min_y;
   max_x_ = new_max_x;
   max_y_ = new_max_y;
-
   ndt_map_mtx_.unlock();
+  // std::cout << "ADDRESS ndt_ptr_: " << ndt_ptr_ << std::endl;
+  // std::cout << "ADDRESS new_ndt_ptr: " << backup_ndt_ptr_ << std::endl;
 
-  // publishPartialPCDMap(pcd_map_array_msg_ptr);
+  publishPartialPCDMap();
+  copyNDT(ndt_ptr_, backup_ndt_ptr_, ndt_implement_type_);
 }
 
 
-// void NDTScanMatcher::publishPartialPCDMap(
-//   const autoware_map_msgs::msg::PCDMapArray::SharedPtr pcd_map_array_msg_ptr)
+// std::shared_ptr<NormalDistributionsTransformBase<PointSource, PointTarget>> NDTScanMatcher::copyNDTPtr(
+//   const std::shared_ptr<NormalDistributionsTransformBase<PointSource, PointTarget>> & input_ndt_ptr)
 // {
-//   sensor_msgs::msg::PointCloud2 pcd_msg;
-//   for (const auto & pcd_info : pcd_map_array_msg_ptr->pcd_maps) {
-//     if (pcd_msg.width == 0) {
-//       pcd_msg = pcd_info.pcd_map;
-//     } else {
-//       pcd_msg.width += pcd_info.pcd_map.width;
-//       pcd_msg.row_step += pcd_info.pcd_map.row_step;
-//       pcd_msg.data.insert(pcd_msg.data.end(),
-//         pcd_info.pcd_map.data.begin(), pcd_info.pcd_map.data.end());
-//     }
-//   }
-//   koji_map_pub_->publish(pcd_msg);
+//   const auto trans_epsilon = ndt_ptr_->getTransformationEpsilon();
+//   const auto step_size = ndt_ptr_->getStepSize();
+//   const auto resolution = ndt_ptr_->getResolution();
+//   const auto max_iterations = ndt_ptr_->getMaximumIterations();
+
+//   new_ndt_ptr->setTransformationEpsilon(trans_epsilon);
+//   new_ndt_ptr->setStepSize(step_size);
+//   new_ndt_ptr->setResolution(resolution);
+//   new_ndt_ptr->setMaximumIterations(max_iterations);
+//   new_ndt_ptr->setRegularizationScaleFactor(regularization_scale_factor_);
 // }
+
+
+void NDTScanMatcher::publishPartialPCDMap()
+{
+  pcl::PointCloud<PointTarget> map_pcl;
+  using T = NormalDistributionsTransformOMPMultiVoxel<PointSource, PointTarget>;
+  std::shared_ptr<T> ndt_omp_ptr = std::dynamic_pointer_cast<T>(ndt_ptr_);
+  ndt_omp_ptr->getVoxelPCD(map_pcl);
+
+  sensor_msgs::msg::PointCloud2 map_msg;
+  pcl::toROSMsg(map_pcl, map_msg);
+  map_msg.header.frame_id = "map";
+  
+  koji_map_pub_->publish(map_msg);
+  std::cout << "published a map!! size = " << map_msg.width << std::endl;
+}
 
 void NDTScanMatcher::callbackSensorPoints(
   sensor_msgs::msg::PointCloud2::ConstSharedPtr sensor_points_sensorTF_msg_ptr)

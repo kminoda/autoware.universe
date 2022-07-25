@@ -34,23 +34,28 @@ MapProvider::MapProvider() : Node("map_provider"), tf2_listener_(tf2_buffer_)
   pointcloud_map_radius_ = this->declare_parameter("pointcloud_map_radius", 50.0);
   update_threshold_distance_ = this->declare_parameter("update_threshold_distance", 100.0);
 
-  // map_points_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>(
-  //   "output/pointcloud_map", rclcpp::QoS(1).transient_local());
+  maps_pub_ = this->create_publisher<autoware_map_msgs::msg::PCDMapArray>(
+    "output/pointcloud_map", rclcpp::QoS(1).transient_local());
 
   pcd_loader_service_group_ = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
-  pcd_loader_client_ = this->create_client<autoware_map_msgs::srv::LoadPCDPartiallyForPublish>(
+  pcd_loader_client_ = this->create_client<autoware_map_msgs::srv::LoadPCDPartially>(
     "pcd_loader_service", rmw_qos_profile_services_default, pcd_loader_service_group_);
   while (!pcd_loader_client_->wait_for_service(std::chrono::seconds(1)) && rclcpp::ok()) {
     RCLCPP_DEBUG(get_logger(), "Waiting for pcd_loader_service...");
   }
 
-  update_map_timer_ = create_wall_timer(
-    std::chrono::microseconds(1000), std::bind(&MapProvider::updateMapTimerCallback, this));
+  // update_map_timer_ = create_wall_timer(
+  //   std::chrono::microseconds(1000), std::bind(&MapProvider::updateMapTimerCallback, this));
+  double map_provider_dt_ = 1.0;
+  auto period_ns =
+    std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::duration<double>(map_provider_dt_));
+  timer_ = rclcpp::create_timer(
+    this, get_clock(), period_ns, std::bind(&MapProvider::timerCallback, this));
 
   pcd_loader_res_ = nullptr;
 }
 
-void MapProvider::updateMapTimerCallback()
+void MapProvider::timerCallback()
 {
   geometry_msgs::msg::TransformStamped transform_stamped;
   try {
@@ -70,18 +75,22 @@ void MapProvider::updateMapTimerCallback()
           update_threshold_distance_)) {
       // no need to update
       return;
+    } else {
+      std::cout << "need an update??????????" << std::endl;
     }
+  } else {
+    std::cout << "pcd_loader_res_ = nullptr" << std::endl;
   }
 
   // update map
-  auto request = std::make_shared<autoware_map_msgs::srv::LoadPCDPartiallyForPublish::Request>();
+  auto request = std::make_shared<autoware_map_msgs::srv::LoadPCDPartially::Request>();
   request->position.x = transform_stamped.transform.translation.x;
   request->position.y = transform_stamped.transform.translation.y;
   request->position.z = transform_stamped.transform.translation.z;
   request->radius = pointcloud_map_radius_;
   auto result{pcd_loader_client_->async_send_request(
     request,
-    [this](const rclcpp::Client<autoware_map_msgs::srv::LoadPCDPartiallyForPublish>::SharedFuture response) {
+    [this](const rclcpp::Client<autoware_map_msgs::srv::LoadPCDPartially>::SharedFuture response) {
       (void)response;
       std::lock_guard<std::mutex> lock{mutex_};
       value_ready_ = true;
@@ -92,14 +101,14 @@ void MapProvider::updateMapTimerCallback()
   // TODO: This may be wrong. Maybe must return when failed to call pcd_loader_ server? (koji
   // minoda)
 
-  // pcd_loader_res_ = result.get();
+  pcd_loader_res_ = result.get();
 
-  // if (pcd_loader_res_->map.width == 0) {
-  //   RCLCPP_ERROR(
-  //     get_logger(), "No Map! pos=%lf, %lf %lf", request->position.x, request->position.y,
-  //     request->position.z);
-  //   return;
-  // }
+  if ((int(pcd_loader_res_->maps.pcd_maps.size()) == 0) & (int(pcd_loader_res_->maps.removing_cloud_ids.size()) == 0)) {
+    // RCLCPP_ERROR(
+    //   get_logger(), "No Map Update! pos=%lf, %lf %lf", request->position.x, request->position.y,
+    //   request->position.z);
+    return;
+  }
 
-  // map_points_pub_->publish(pcd_loader_res_->map);
+  maps_pub_->publish(pcd_loader_res_->maps);
 }

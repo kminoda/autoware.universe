@@ -36,6 +36,7 @@
 
 #include <rclcpp/rclcpp.hpp>
 
+#include <std_msgs/msg/string.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
 #include <tier4_debug_msgs/msg/float32_stamped.hpp>
 #include <autoware_map_msgs/msg/pcd_map_array.hpp>
@@ -78,8 +79,6 @@ private:
   bool enable_partial_load_;
   float leaf_size_;
 
-  std::set<std::string> previously_loaded_pcd_paths_;
-
   std::string map_frame_;
   std::string viewer_frame_;
   std::shared_ptr<tf2_ros::StaticTransformBroadcaster> static_broadcaster_;
@@ -97,23 +96,21 @@ private:
   {
     pcl::PointXYZ min;
     pcl::PointXYZ max;
-    std::string path;
   };
-  std::vector<PCDFileMetadata> pcd_file_metadata_array_;
-  std::vector<PCDFileMetadata> generatePCDMetadata(
-    const std::vector<std::string> & pcd_paths) const;
+  std::map<std::string, PCDFileMetadata> current_pcd_file_metadata_dict_;
+  std::map<std::string, PCDFileMetadata> all_pcd_file_metadata_dict_;
+  void generatePCDMetadata(
+    const std::vector<std::string> & pcd_paths);
 
   // sensor_msgs::msg::PointCloud2 loadPCDPartially(
   //   const geometry_msgs::msg::Point position, const float radius,
   //   std::vector<PCDFileMetadata> pcd_file_metadata_array) const;
 
   autoware_map_msgs::msg::PCDMapArray loadPCDPartially(
-    const geometry_msgs::msg::Point position, const float radius,
-    std::vector<PCDFileMetadata> pcd_file_metadata_array) const;
+    const geometry_msgs::msg::Point position, const float radius);
 
-  bool continueToLoadMaps(
-    const geometry_msgs::msg::Point position, const float radius,
-    std::vector<PCDFileMetadata> pcd_file_metadata_array);
+  bool updateLoadedMaps(
+    const geometry_msgs::msg::Point position, const float radius);
   bool loadPCDPartiallyForPublishServiceCallback(
     autoware_map_msgs::srv::LoadPCDPartiallyForPublish::Request::SharedPtr req,
     autoware_map_msgs::srv::LoadPCDPartiallyForPublish::Response::SharedPtr res);

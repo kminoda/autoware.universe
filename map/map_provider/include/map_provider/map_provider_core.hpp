@@ -17,7 +17,8 @@
 #ifndef MAP_PROVIDER__MAP_PROVIDER_CORE_HPP_
 #define MAP_PROVIDER__MAP_PROVIDER_CORE_HPP_
 
-#include "autoware_map_msgs/srv/load_pcd_partially_for_publish.hpp"
+#include "autoware_map_msgs/srv/load_pcd_partially.hpp"
+#include "autoware_map_msgs/msg/pcd_map_array.hpp"
 
 #include <rclcpp/rclcpp.hpp>
 
@@ -45,11 +46,12 @@ private:
   float pointcloud_map_radius_;
   float update_threshold_distance_;
 
-  autoware_map_msgs::srv::LoadPCDPartiallyForPublish::Response::SharedPtr pcd_loader_res_;
+  autoware_map_msgs::srv::LoadPCDPartially::Response::SharedPtr pcd_loader_res_;
 
-  // rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr map_points_pub_;
-  rclcpp::Client<autoware_map_msgs::srv::LoadPCDPartiallyForPublish>::SharedPtr pcd_loader_client_;
-  rclcpp::TimerBase::SharedPtr update_map_timer_;
+  rclcpp::Publisher<autoware_map_msgs::msg::PCDMapArray>::SharedPtr maps_pub_;
+  rclcpp::Client<autoware_map_msgs::srv::LoadPCDPartially>::SharedPtr pcd_loader_client_;
+  // rclcpp::TimerBase::SharedPtr update_map_timer_;
+  rclcpp::TimerBase::SharedPtr timer_;
 
   rclcpp::CallbackGroup::SharedPtr pcd_loader_service_group_;
 
@@ -57,7 +59,7 @@ private:
   std::condition_variable condition_;
   bool value_ready_ = false;
 
-  void updateMapTimerCallback();
+  void timerCallback();
 };
 
 #endif  // MAP_PROVIDER__MAP_PROVIDER_CORE_HPP_

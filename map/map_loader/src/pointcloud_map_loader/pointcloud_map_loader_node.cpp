@@ -165,7 +165,7 @@ PointCloudMapLoaderNode::PointCloudMapLoaderNode(const rclcpp::NodeOptions & opt
     //   "output/pointcloud_map/partial", rclcpp::QoS{1});
     pub_partial_pointcloud_maps_ = this->create_publisher<autoware_map_msgs::msg::PCDMapArray>(
       "output/pointcloud_map/partial", rclcpp::QoS{1});
-    pcd_file_metadata_array_ = generatePCDMetadata(pcd_paths);
+    generatePCDMetadata(pcd_paths);
     load_pcd_partially_service_ = this->create_service<autoware_map_msgs::srv::LoadPCDPartially>(
       "load_pcd_partially", std::bind(
                               &PointCloudMapLoaderNode::loadPCDPartiallyServiceCallback, this,
@@ -220,10 +220,9 @@ sensor_msgs::msg::PointCloud2 PointCloudMapLoaderNode::loadPCDFiles(
   return whole_pcd;
 }
 
-std::vector<PointCloudMapLoaderNode::PCDFileMetadata> PointCloudMapLoaderNode::generatePCDMetadata(
-  const std::vector<std::string> & pcd_paths) const
+void PointCloudMapLoaderNode::generatePCDMetadata(
+  const std::vector<std::string> & pcd_paths)
 {
-  std::vector<PCDFileMetadata> metadata_array;
   pcl::PointCloud<pcl::PointXYZ> partial_pcd;
   for (const auto & path : pcd_paths) {
     if (pcl::io::loadPCDFile(path, partial_pcd) == -1) {
@@ -231,53 +230,38 @@ std::vector<PointCloudMapLoaderNode::PCDFileMetadata> PointCloudMapLoaderNode::g
     }
     PointCloudMapLoaderNode::PCDFileMetadata metadata = {};
     pcl::getMinMax3D(partial_pcd, metadata.min, metadata.max);
-    metadata.path = path;
-    metadata_array.push_back(metadata);
+    all_pcd_file_metadata_dict_[path] = metadata;
   }
-  return metadata_array;
 }
 
 autoware_map_msgs::msg::PCDMapArray PointCloudMapLoaderNode::loadPCDPartially(
-  const geometry_msgs::msg::Point position, const float radius,
-  std::vector<PointCloudMapLoaderNode::PCDFileMetadata> pcd_file_metadata_array) const
+  const geometry_msgs::msg::Point position, const float radius)
 {
   std::map<std::string, sensor_msgs::msg::PointCloud2> pcd_dict;
+  std::vector<std::string> pcd_ids_to_remove;
   sensor_msgs::msg::PointCloud2 pcd;
   // const auto loading_start_time = std::chrono::system_clock::now();
 
-  for (const auto & metadata : pcd_file_metadata_array) {
-    if (sphere_and_box_overlap_exists(position, radius, metadata.min, metadata.max)) {
-      if (pcl::io::loadPCDFile(metadata.path, pcd) == -1) {
-        RCLCPP_ERROR_STREAM(get_logger(), "PCD load failed: " << metadata.path);
+  for (const auto & ele : all_pcd_file_metadata_dict_) {
+    std::string path = ele.first;
+    PCDFileMetadata metadata = ele.second;
+
+    bool is_neighbor_grid = sphere_and_box_overlap_exists(position, radius, metadata.min, metadata.max);
+    bool is_not_loaded_in_previous_dict = current_pcd_file_metadata_dict_.find(path) == current_pcd_file_metadata_dict_.end();
+    if (is_neighbor_grid & is_not_loaded_in_previous_dict) {
+      if (pcl::io::loadPCDFile(path, pcd) == -1) {
+        RCLCPP_ERROR_STREAM(get_logger(), "PCD load failed: " << path);
       }
-      pcd_dict[metadata.path] = pcd;
-      // if (filtered_pcd.width == 0) {
-      //   filtered_pcd = pcd;
-      // } else {
-      //   filtered_pcd.width += pcd.width;
-      //   filtered_pcd.row_step += pcd.row_step;
-      //   // filtered_pcd.data.reserve(filtered_pcd.data.size() + pcd.data.size()); // ToDo (koji
-      //   // minoda): erasing this line significantly improved the computation speed. WHY???
-      //   filtered_pcd.data.insert(filtered_pcd.data.end(), pcd.data.begin(), pcd.data.end());
-      // }
+      std::cout << "Load map path: " << path << std::endl;
+
+      pcd_dict[path] = pcd;
+      current_pcd_file_metadata_dict_[path] = metadata;
+    }
+    if (!is_neighbor_grid & !is_not_loaded_in_previous_dict) {
+      current_pcd_file_metadata_dict_.erase(path);
+      pcd_ids_to_remove.push_back(path);
     }
   }
-
-  // const auto loading_end_time = std::chrono::system_clock::now();
-  // const double loading_time =
-  //   std::chrono::duration_cast<std::chrono::microseconds>(loading_end_time - loading_start_time)
-  //     .count() /
-  //   1000.0;
-  // tier4_debug_msgs::msg::Float32Stamped msg;
-  // msg.stamp = this->now();
-  // msg.data = loading_time;
-  // pub_debug_loading_time_ms_->publish(msg);
-  // RCLCPP_INFO_STREAM(
-  //   get_logger(), "KOJI loadPCDPartially @map_loader: " << loading_time << " [ms], num points: "
-  //                                                       << int(filtered_pcd.width));
-
-  // filtered_pcd.header.frame_id = "map";
-  // return filtered_pcd;
 
   autoware_map_msgs::msg::PCDMapArray pcd_map_array_msg;
   for (const auto & pcd_info: pcd_dict) {
@@ -286,35 +270,50 @@ autoware_map_msgs::msg::PCDMapArray PointCloudMapLoaderNode::loadPCDPartially(
     pcd_map_msg.pcd_map = pcd_info.second; // avoidable copy?
     pcd_map_array_msg.pcd_maps.push_back(pcd_map_msg);
   }
-  RCLCPP_INFO(get_logger(), "# of loaded PCDs = %d", int(pcd_dict.size()));
+  pcd_map_array_msg.removing_cloud_ids = pcd_ids_to_remove;
+  // for (const std::string & pcd_id_to_remove : pcd_ids_to_remove) {
+  //   pcd_map_array_msg.removing_cloud_ids.push_back(pcd_id_to_remove);
+  // }
+
+  RCLCPP_INFO(get_logger(),
+    "# of loaded PCDs = %d (Add: %d, Remove: %d)",
+    int(current_pcd_file_metadata_dict_.size()),
+    int(pcd_map_array_msg.pcd_maps.size()),
+    int(pcd_map_array_msg.removing_cloud_ids.size())
+  );
+
   return pcd_map_array_msg;
 }
 
-bool PointCloudMapLoaderNode::continueToLoadMaps(
-  const geometry_msgs::msg::Point position, const float radius,
-  std::vector<PointCloudMapLoaderNode::PCDFileMetadata> pcd_file_metadata_array)
-{
-  std::set<std::string> pcd_maps_to_load;
-  for (const auto & metadata : pcd_file_metadata_array) {
-    if (sphere_and_box_overlap_exists(position, radius, metadata.min, metadata.max)) {
-      pcd_maps_to_load.insert(metadata.path);
-    }
-  }
+// bool PointCloudMapLoaderNode::updateLoadedMaps(
+//   const geometry_msgs::msg::Point position, const float radius)
+// {
+//   std::set<std::string> pcd_maps_to_load;
+//   for (const auto & ele : all_pcd_file_metadata_dict_) {
+//     std::string path = ele.first;
+//     PCDFileMetadata metadata = ele.second;
 
-  if (int(pcd_maps_to_load.size()) == 0) {
-    RCLCPP_INFO_STREAM(
-      get_logger(),
-      "Empty pcd map! (Please check if you are using the right pcd maps and giving an appropriate "
-      "initial pose.)");
-    return false;
-  }
+//     bool is_neighbor_grid = sphere_and_box_overlap_exists(position, radius, metadata.min, metadata.max);
+//     bool is_not_loaded_in_previous_dict = 
+//     if (is_neighbor_grid & is_not_loaded_in_previous_dict) {
+//       pcd_maps_to_load.insert(path);
+//     }
+//   }
 
-  if (pcd_maps_to_load == previously_loaded_pcd_paths_) {
-    RCLCPP_INFO_STREAM(get_logger(), "The same request received as before! Skip loading");
-    return false;
-  }
-  return true;
-}
+//   if (int(pcd_maps_to_load.size()) == 0) {
+//     RCLCPP_INFO_STREAM(
+//       get_logger(),
+//       "Empty pcd map! (Please check if you are using the right pcd maps and giving an appropriate "
+//       "initial pose.)");
+//     return false;
+//   }
+
+//   // if (pcd_maps_to_load == previously_loaded_pcd_paths_) {
+//   //   RCLCPP_INFO_STREAM(get_logger(), "The same request received as before! Skip loading");
+//   //   return false;
+//   // }
+//   return true;
+// }
 
 bool PointCloudMapLoaderNode::loadPCDPartiallyForPublishServiceCallback(
   autoware_map_msgs::srv::LoadPCDPartiallyForPublish::Request::SharedPtr req,
@@ -322,12 +321,12 @@ bool PointCloudMapLoaderNode::loadPCDPartiallyForPublishServiceCallback(
 {
   res->position = req->position;
   res->radius = req->radius;
-  if (!continueToLoadMaps(req->position, req->radius, pcd_file_metadata_array_)) {
-    return true;
-  }
+  // if (!updateLoadedMaps(req->position, req->radius)) {
+  //   return true;
+  // }
   pub_partial_pointcloud_maps_->publish(
-    loadPCDPartially(req->position, req->radius, pcd_file_metadata_array_));
-  RCLCPP_INFO_STREAM(get_logger(), "Load PCD Partially for publish");
+    loadPCDPartially(req->position, req->radius));
+  // RCLCPP_INFO_STREAM(get_logger(), "Load PCD Partially for publish");
   return true;
 }
 
@@ -337,11 +336,11 @@ bool PointCloudMapLoaderNode::loadPCDPartiallyServiceCallback(
 {
   res->position = req->position;
   res->radius = req->radius;
-  if (!continueToLoadMaps(req->position, req->radius, pcd_file_metadata_array_)) {
-    return true;
-  }
-  res->maps = loadPCDPartially(req->position, req->radius, pcd_file_metadata_array_);
-  RCLCPP_INFO_STREAM(get_logger(), "Load PCD Partially");
+  // if (!updateLoadedMaps(req->position, req->radius)) {
+  //   return true;
+  // }
+  res->maps = loadPCDPartially(req->position, req->radius);
+  // RCLCPP_INFO_STREAM(get_logger(), "Load PCD Partially");
   return true;
 }
 

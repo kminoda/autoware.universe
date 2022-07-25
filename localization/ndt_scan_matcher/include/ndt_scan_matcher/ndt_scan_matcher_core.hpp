@@ -97,6 +97,42 @@ std::shared_ptr<NormalDistributionsTransformBase<PointSource, PointTarget>> getN
   throw std::runtime_error(s);
 }
 
+template <typename PointSource, typename PointTarget>
+void copyNDT(
+  const std::shared_ptr<NormalDistributionsTransformBase<PointSource, PointTarget>> & input_ndt_ptr,
+  const std::shared_ptr<NormalDistributionsTransformBase<PointSource, PointTarget>> & output_ndt_ptr,
+  const NDTImplementType & ndt_mode)
+{
+  // std::shared_ptr<NormalDistributionsTransformBase<PointSource, PointTarget>> ndt_ptr;
+  if (ndt_mode == NDTImplementType::PCL_GENERIC) {
+    using T = NormalDistributionsTransformPCLGeneric<PointSource, PointTarget>;
+    std::shared_ptr<T> input_ndt_tmp_ptr = std::dynamic_pointer_cast<T>(input_ndt_ptr);
+    std::shared_ptr<T> output_ndt_tmp_ptr = std::dynamic_pointer_cast<T>(output_ndt_ptr);
+    *output_ndt_tmp_ptr = *input_ndt_tmp_ptr;
+  }
+  if (ndt_mode == NDTImplementType::PCL_MODIFIED) {
+    using T = NormalDistributionsTransformPCLModified<PointSource, PointTarget>;
+    std::shared_ptr<T> input_ndt_tmp_ptr = std::dynamic_pointer_cast<T>(input_ndt_ptr);
+    std::shared_ptr<T> output_ndt_tmp_ptr = std::dynamic_pointer_cast<T>(output_ndt_ptr);
+    *output_ndt_tmp_ptr = *input_ndt_tmp_ptr;
+  }
+  if (ndt_mode == NDTImplementType::OMP) {
+    using T = NormalDistributionsTransformOMP<PointSource, PointTarget>;
+    std::shared_ptr<T> input_ndt_tmp_ptr = std::dynamic_pointer_cast<T>(input_ndt_ptr);
+    std::shared_ptr<T> output_ndt_tmp_ptr = std::dynamic_pointer_cast<T>(output_ndt_ptr);
+    *output_ndt_tmp_ptr = *input_ndt_tmp_ptr;
+  }
+  if (ndt_mode == NDTImplementType::OMP_MULTI_VOXEL) {
+    using T = NormalDistributionsTransformOMPMultiVoxel<PointSource, PointTarget>;
+    std::shared_ptr<T> input_ndt_tmp_ptr = std::dynamic_pointer_cast<T>(input_ndt_ptr);
+    std::shared_ptr<T> output_ndt_tmp_ptr = std::dynamic_pointer_cast<T>(output_ndt_ptr);
+    *output_ndt_tmp_ptr = *input_ndt_tmp_ptr;
+  } else {
+    const std::string s = fmt::format("Unknown NDT type {}", static_cast<int>(ndt_mode));
+    throw std::runtime_error(s);
+  }
+}
+
 class NDTScanMatcher : public rclcpp::Node
 {
   using PointSource = pcl::PointXYZ;
@@ -125,7 +161,7 @@ private:
     geometry_msgs::msg::PoseWithCovarianceStamped::ConstSharedPtr pose_conv_msg_ptr);
   void callbackRegularizationPose(
     geometry_msgs::msg::PoseWithCovarianceStamped::ConstSharedPtr pose_conv_msg_ptr);
-
+  void publishPartialPCDMap();
   geometry_msgs::msg::PoseWithCovarianceStamped alignUsingMonteCarlo(
     const std::shared_ptr<NormalDistributionsTransformBase<PointSource, PointTarget>> & ndt_ptr,
     const geometry_msgs::msg::PoseWithCovarianceStamped & initial_pose_with_cov);
@@ -193,6 +229,7 @@ private:
 
   NDTImplementType ndt_implement_type_;
   std::shared_ptr<NormalDistributionsTransformBase<PointSource, PointTarget>> ndt_ptr_;
+  std::shared_ptr<NormalDistributionsTransformBase<PointSource, PointTarget>> backup_ndt_ptr_;
 
   Eigen::Matrix4f base_to_sensor_matrix_;
   std::string base_frame_;
