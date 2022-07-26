@@ -104,29 +104,29 @@ void copyNDT(
   const NDTImplementType & ndt_mode)
 {
   // std::shared_ptr<NormalDistributionsTransformBase<PointSource, PointTarget>> ndt_ptr;
-  if (ndt_mode == NDTImplementType::PCL_GENERIC) {
-    using T = NormalDistributionsTransformPCLGeneric<PointSource, PointTarget>;
-    std::shared_ptr<T> input_ndt_tmp_ptr = std::dynamic_pointer_cast<T>(input_ndt_ptr);
-    std::shared_ptr<T> output_ndt_tmp_ptr = std::dynamic_pointer_cast<T>(output_ndt_ptr);
-    *output_ndt_tmp_ptr = *input_ndt_tmp_ptr;
-  }
-  if (ndt_mode == NDTImplementType::PCL_MODIFIED) {
-    using T = NormalDistributionsTransformPCLModified<PointSource, PointTarget>;
-    std::shared_ptr<T> input_ndt_tmp_ptr = std::dynamic_pointer_cast<T>(input_ndt_ptr);
-    std::shared_ptr<T> output_ndt_tmp_ptr = std::dynamic_pointer_cast<T>(output_ndt_ptr);
-    *output_ndt_tmp_ptr = *input_ndt_tmp_ptr;
-  }
-  if (ndt_mode == NDTImplementType::OMP) {
-    using T = NormalDistributionsTransformOMP<PointSource, PointTarget>;
-    std::shared_ptr<T> input_ndt_tmp_ptr = std::dynamic_pointer_cast<T>(input_ndt_ptr);
-    std::shared_ptr<T> output_ndt_tmp_ptr = std::dynamic_pointer_cast<T>(output_ndt_ptr);
-    *output_ndt_tmp_ptr = *input_ndt_tmp_ptr;
-  }
+  // if (ndt_mode == NDTImplementType::PCL_GENERIC) {
+  //   using T = NormalDistributionsTransformPCLGeneric<PointSource, PointTarget>;
+  //   std::shared_ptr<T> input_ndt_tmp_ptr = std::dynamic_pointer_cast<T>(input_ndt_ptr);
+  //   std::shared_ptr<T> output_ndt_tmp_ptr = std::dynamic_pointer_cast<T>(output_ndt_ptr);
+  //   *output_ndt_tmp_ptr = *input_ndt_tmp_ptr;
+  // }
+  // else if (ndt_mode == NDTImplementType::PCL_MODIFIED) {
+  //   using T = NormalDistributionsTransformPCLModified<PointSource, PointTarget>;
+  //   std::shared_ptr<T> input_ndt_tmp_ptr = std::dynamic_pointer_cast<T>(input_ndt_ptr);
+  //   std::shared_ptr<T> output_ndt_tmp_ptr = std::dynamic_pointer_cast<T>(output_ndt_ptr);
+  //   *output_ndt_tmp_ptr = *input_ndt_tmp_ptr;
+  // }
+  // else if (ndt_mode == NDTImplementType::OMP) {
+  //   using T = NormalDistributionsTransformOMP<PointSource, PointTarget>;
+  //   std::shared_ptr<T> input_ndt_tmp_ptr = std::dynamic_pointer_cast<T>(input_ndt_ptr);
+  //   std::shared_ptr<T> output_ndt_tmp_ptr = std::dynamic_pointer_cast<T>(output_ndt_ptr);
+  //   *output_ndt_tmp_ptr = *input_ndt_tmp_ptr;
+  // } else
   if (ndt_mode == NDTImplementType::OMP_MULTI_VOXEL) {
     using T = NormalDistributionsTransformOMPMultiVoxel<PointSource, PointTarget>;
     std::shared_ptr<T> input_ndt_tmp_ptr = std::dynamic_pointer_cast<T>(input_ndt_ptr);
     std::shared_ptr<T> output_ndt_tmp_ptr = std::dynamic_pointer_cast<T>(output_ndt_ptr);
-    *output_ndt_tmp_ptr = *input_ndt_tmp_ptr;
+    output_ndt_tmp_ptr->copyFrom(*input_ndt_tmp_ptr);
   } else {
     const std::string s = fmt::format("Unknown NDT type {}", static_cast<int>(ndt_mode));
     throw std::runtime_error(s);

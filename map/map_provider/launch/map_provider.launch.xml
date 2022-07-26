@@ -5,6 +5,6 @@
     <remap from="pcd_provider_service" to="/map_provider/provide_map"/>
 
     <param name="pointcloud_map_radius" value="100.0"/>
-    <param name="update_threshold_distance" value="20.0"/>
+    <param name="update_threshold_distance" value="10.0"/>
   </node>
 </launch>

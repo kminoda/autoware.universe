@@ -79,6 +79,8 @@ public:
   void removeTarget(const std::string map_id);
   void createVoxelKdtree();
   void getVoxelPCD(pcl::PointCloud<PointTarget> & output);
+  void getNDTPtr(pcl::shared_ptr<pclomp::NormalDistributionsTransformMultiVoxel<PointSource, PointTarget>> & output) const;
+  void copyFrom(const NormalDistributionsTransformOMPMultiVoxel<PointSource, PointTarget> & input);
 
 private:
   pcl::shared_ptr<pclomp::NormalDistributionsTransformMultiVoxel<PointSource, PointTarget>> ndt_ptr_;

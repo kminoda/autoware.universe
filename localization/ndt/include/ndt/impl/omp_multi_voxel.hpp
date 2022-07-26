@@ -254,4 +254,21 @@ void NormalDistributionsTransformOMPMultiVoxel<PointSource, PointTarget>::getVox
 //   return ndt_ptr_->getNeighborhoodSearchMethod();
 // }
 
+template <class PointSource, class PointTarget>
+void NormalDistributionsTransformOMPMultiVoxel<PointSource, PointTarget>::getNDTPtr(
+  pcl::shared_ptr<pclomp::NormalDistributionsTransformMultiVoxel<PointSource, PointTarget>> & output) const
+{
+  output = ndt_ptr_;
+}
+
+template <class PointSource, class PointTarget>
+void NormalDistributionsTransformOMPMultiVoxel<PointSource, PointTarget>::copyFrom(
+  const NormalDistributionsTransformOMPMultiVoxel<PointSource, PointTarget> & input)
+{
+  pcl::shared_ptr<pclomp::NormalDistributionsTransformMultiVoxel<PointSource, PointTarget>> ndt_ptr_input;
+  input.getNDTPtr(ndt_ptr_input);
+  ndt_ptr_->copyFrom(*ndt_ptr_input);
+}
+
+
 #endif  // NDT__IMPL__OMP_MULTI_VOXEL_HPP_

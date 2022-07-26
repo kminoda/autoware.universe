@@ -169,6 +169,8 @@ void PoseInitializer::callbackInitialPose(
 {
   enable_gnss_callback_ = false;  // get only first topic
 
+  std::cout << "Initial pose received" << std::endl;
+
   auto add_height_pose_msg_ptr = std::make_shared<geometry_msgs::msg::PoseWithCovarianceStamped>();
   getHeight(*pose_cov_msg_ptr, add_height_pose_msg_ptr);
 

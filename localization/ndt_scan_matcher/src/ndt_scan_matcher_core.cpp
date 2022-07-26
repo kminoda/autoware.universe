@@ -443,11 +443,9 @@ void NDTScanMatcher::callbackMapPoints(
   if (ndt_implement_type_ == NDTImplementType::OMP_MULTI_VOXEL) {
     using T = NormalDistributionsTransformOMPMultiVoxel<PointSource, PointTarget>;
     std::shared_ptr<T> backup_ndt_omp_ptr = std::dynamic_pointer_cast<T>(backup_ndt_ptr_);
-    // std::cout << "Start filtering maps. Size = " << int(pcd_map_array_msg_ptr->pcd_maps.size()) << std::endl;
 
     // Add pcd
     for (const auto & pcd_map_info: pcd_map_array_msg_ptr->pcd_maps) {
-      // std::cout << "Filtering map: " << pcd_map_info.map_id << std::endl;
       pcl::shared_ptr<pcl::PointCloud<PointTarget>> map_points_ptr(new pcl::PointCloud<PointTarget>);
       pcl::fromROSMsg(pcd_map_info.pcd_map, *map_points_ptr);
       backup_ndt_omp_ptr->setInputTarget(map_points_ptr, pcd_map_info.map_id);
@@ -460,10 +458,6 @@ void NDTScanMatcher::callbackMapPoints(
 
     backup_ndt_omp_ptr->createVoxelKdtree();
   }
-
-  auto output_cloud = std::make_shared<pcl::PointCloud<PointSource>>();
-  backup_ndt_ptr_->align(
-    *output_cloud, Eigen::Matrix4f::Identity());  // No longer necessary for ndt_omp
 
   double new_min_x = std::numeric_limits<double>::max();
   double new_min_y = std::numeric_limits<double>::max();
@@ -506,9 +500,8 @@ void NDTScanMatcher::callbackMapPoints(
   min_y_ = new_min_y;
   max_x_ = new_max_x;
   max_y_ = new_max_y;
+  
   ndt_map_mtx_.unlock();
-  // std::cout << "ADDRESS ndt_ptr_: " << ndt_ptr_ << std::endl;
-  // std::cout << "ADDRESS new_ndt_ptr: " << backup_ndt_ptr_ << std::endl;
 
   publishPartialPCDMap();
   copyNDT(ndt_ptr_, backup_ndt_ptr_, ndt_implement_type_);
