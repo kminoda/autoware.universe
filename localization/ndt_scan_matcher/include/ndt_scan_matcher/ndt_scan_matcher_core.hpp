@@ -127,6 +127,11 @@ void copyNDT(
     std::shared_ptr<T> input_ndt_tmp_ptr = std::dynamic_pointer_cast<T>(input_ndt_ptr);
     std::shared_ptr<T> output_ndt_tmp_ptr = std::dynamic_pointer_cast<T>(output_ndt_ptr);
     output_ndt_tmp_ptr->copyFrom(*input_ndt_tmp_ptr);
+    output_ndt_tmp_ptr->setNumThreads(input_ndt_tmp_ptr->getNumThreads());
+    output_ndt_tmp_ptr->setTransformationEpsilon(input_ndt_tmp_ptr->getTransformationEpsilon());
+    output_ndt_tmp_ptr->setStepSize(input_ndt_tmp_ptr->getStepSize());
+    output_ndt_tmp_ptr->setResolution(input_ndt_tmp_ptr->getResolution());
+    output_ndt_tmp_ptr->setMaximumIterations(input_ndt_tmp_ptr->getMaximumIterations());
   } else {
     const std::string s = fmt::format("Unknown NDT type {}", static_cast<int>(ndt_mode));
     throw std::runtime_error(s);
