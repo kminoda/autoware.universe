@@ -175,8 +175,6 @@ NDTScanMatcher::NDTScanMatcher()
   ndt_ptr_->setRegularizationScaleFactor(regularization_scale_factor_);
 
   copyNDT(ndt_ptr_, backup_ndt_ptr_, ndt_implement_type_);
-  // std::cout << "ADDRESS ndt_ptr_: " << ndt_ptr_ << std::endl;
-  // std::cout << "ADDRESS new_ndt_ptr: " << backup_ndt_ptr_ << std::endl;
 
   RCLCPP_INFO(
     get_logger(), "trans_epsilon: %lf, step_size: %lf, resolution: %lf, max_iterations: %d",

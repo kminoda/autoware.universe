@@ -268,6 +268,11 @@ void NormalDistributionsTransformOMPMultiVoxel<PointSource, PointTarget>::copyFr
   pcl::shared_ptr<pclomp::NormalDistributionsTransformMultiVoxel<PointSource, PointTarget>> ndt_ptr_input;
   input.getNDTPtr(ndt_ptr_input);
   ndt_ptr_->copyFrom(*ndt_ptr_input);
+  ndt_ptr_->setNumThreads(ndt_ptr_input->getNumThreads());
+  ndt_ptr_->setTransformationEpsilon(ndt_ptr_input->getTransformationEpsilon());
+  ndt_ptr_->setStepSize(ndt_ptr_input->getStepSize());
+  ndt_ptr_->setResolution(ndt_ptr_input->getResolution());
+  ndt_ptr_->setMaximumIterations(ndt_ptr_input->getMaximumIterations());
 }
 
 
