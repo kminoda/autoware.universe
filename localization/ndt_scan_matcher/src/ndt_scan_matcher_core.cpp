@@ -255,6 +255,10 @@ NDTScanMatcher::NDTScanMatcher()
     this->create_subscription<geometry_msgs::msg::PoseWithCovarianceStamped>(
       "regularization_pose_with_covariance", 100,
       std::bind(&NDTScanMatcher::callbackRegularizationPose, this, std::placeholders::_1));
+  ekf_odom_sub_ =
+    this->create_subscription<nav_msgs::msg::Odometry>(
+      "ekf_odom", 100,
+      std::bind(&NDTScanMatcher::callbackEKFOdom, this, std::placeholders::_1));
 
   sensor_aligned_pose_pub_ =
     this->create_publisher<sensor_msgs::msg::PointCloud2>("points_aligned", 10);
@@ -305,6 +309,7 @@ NDTScanMatcher::NDTScanMatcher()
   last_update_position_ptr_ = nullptr;
   update_threshold_distance_ = 10; // TODO koji minoda kokoyabai
   loading_radius_ = 100; // TODO koji minoda kokoyabai
+  ekf_latest_position_ptr_ = nullptr;
 
   double map_update_dt = 1.0;
   auto period_ns =
@@ -395,29 +400,25 @@ void NDTScanMatcher::serviceNDTAlign(
   res->success = true;
   res->seq = req->seq;
   res->pose_with_covariance.pose.covariance = req->pose_with_covariance.pose.covariance;
+
+  last_update_position_ptr_ = std::make_shared<geometry_msgs::msg::Point>(res->pose_with_covariance.pose.pose.position);
+}
+
+void NDTScanMatcher::callbackEKFOdom(nav_msgs::msg::Odometry::ConstSharedPtr odom_ptr)
+{
+  ekf_latest_position_ptr_ = std::make_shared<geometry_msgs::msg::Point>(odom_ptr->pose.pose.position);
 }
 
 void NDTScanMatcher::mapUpdateTimerCallback()
 {
-  // // get the current position
-  // geometry_msgs::msg::Point current_position;
-  // try {
-  //   geometry_msgs::msg::TransformStamped current_trans = tf2_buffer_.lookupTransform(
-  //     "map", "base_link", tf2::TimePointZero, tf2::durationFromSec(1.0));
-  //     current_position.x = current_trans.transform.translation.x;
-  //     current_position.y = current_trans.transform.translation.y;
-  //     current_position.z = current_trans.transform.translation.z;
-  // } catch (tf2::TransformException & ex) {
-  //   RCLCPP_WARN(
-  //     get_logger(), "Could NOT transform pose %s frame to %s frame : %s", "map", "base_link",
-  //     ex.what());
-  //   return;
-  // }
+  if (ekf_latest_position_ptr_ == nullptr) return;
 
   // // continue only if we should update the map
-  // if (shouldUpdateMap(current_position))
+  // if (shouldUpdateMap(current_position) & (last_update_position_ptr_ != nullptr))
   // {
+  //   std::cout << "KOJI timerCallback (current_position.x, last pos.x) = (" << current_position.x << ", " << last_update_position_ptr_->x << ")" << std::endl;
   //   updateMap(current_position);
+  //   last_update_position_ptr_ = std::make_shared<geometry_msgs::msg::Point>(current_position);
   // }
 }
 
@@ -435,7 +436,7 @@ void NDTScanMatcher::updateMap(const geometry_msgs::msg::Point & position)
   request->mode = 1; // differential load
   request->area.center = position;
   request->area.radius = loading_radius_;
-  request->already_loaded_ids = getCurrentMapIDs();
+  request->already_loaded_ids = getCurrentMapIDs(ndt_ptr_);
 
   // send a request to map_loader
   auto result{pcd_loader_client_->async_send_request(
@@ -461,14 +462,13 @@ void NDTScanMatcher::updateMap(const geometry_msgs::msg::Point & position)
   std::vector<std::string> map_ids_to_remove = getMapIDsToRemove(map_ids_ndt_will_possess);
 
   updateNdtWithNewMap(result.get()->loaded_pcds, map_ids_to_remove);
-  last_update_position_ptr_ = std::make_shared<geometry_msgs::msg::Point>(position);
 }
 
 std::vector<std::string> NDTScanMatcher::getMapIDsToRemove(
   const std::vector<std::string> & map_ids_ndt_will_possess)
 {
   std::vector<std::string> map_ids_to_remove;
-  std::vector<std::string> current_map_ids = getCurrentMapIDs();
+  std::vector<std::string> current_map_ids = getCurrentMapIDs(ndt_ptr_);
   for (std::string current_map_id: current_map_ids)
   {
     bool should_remove = std::find(map_ids_ndt_will_possess.begin(), map_ids_ndt_will_possess.end(), current_map_id) == map_ids_ndt_will_possess.end();
@@ -478,11 +478,11 @@ std::vector<std::string> NDTScanMatcher::getMapIDsToRemove(
   return map_ids_to_remove;
 }
 
-std::vector<std::string> NDTScanMatcher::getCurrentMapIDs()
+std::vector<std::string> NDTScanMatcher::getCurrentMapIDs(
+  const std::shared_ptr<NormalDistributionsTransformBase<PointSource, PointTarget>> & ndt_ptr)
 {
   using T = NormalDistributionsTransformOMPMultiVoxel<PointSource, PointTarget>;
-  // std::shared_ptr<T> ndt_omp_ptr = std::dynamic_pointer_cast<T>(ndt_ptr_);
-  std::shared_ptr<T> ndt_omp_ptr = std::dynamic_pointer_cast<T>(backup_ndt_ptr_);
+  std::shared_ptr<T> ndt_omp_ptr = std::dynamic_pointer_cast<T>(ndt_ptr);
   return ndt_omp_ptr->getCurrentMapIDs();
 }
 
@@ -495,7 +495,6 @@ void NDTScanMatcher::updateNdtWithNewMap(
     std::cout << "No map update" << std::endl;
     return;
   }
-
   const auto KOJI_exe_start_time = std::chrono::system_clock::now();
 
   if (ndt_implement_type_ == NDTImplementType::OMP_MULTI_VOXEL) {
@@ -518,13 +517,8 @@ void NDTScanMatcher::updateNdtWithNewMap(
   }
 
   const auto KOJI_exe_end_time = std::chrono::system_clock::now();
-  const double KOJI_exe_time =
-    std::chrono::duration_cast<std::chrono::microseconds>(KOJI_exe_end_time - KOJI_exe_start_time)
-      .count() /
-    1000.0;
-  RCLCPP_INFO_STREAM(
-    get_logger(),
-    "KOJI until align in callbackMapPoints @ndt_scan_matcher: " << KOJI_exe_time << " [ms]");
+  const double KOJI_exe_time = std::chrono::duration_cast<std::chrono::microseconds>(KOJI_exe_end_time - KOJI_exe_start_time).count() / 1000.0;
+  RCLCPP_INFO_STREAM(get_logger(), "KOJI until align in callbackMapPoints @ndt_scan_matcher: " << KOJI_exe_time << " [ms]");
 
   // swap
   ndt_map_mtx_.lock();
@@ -575,10 +569,9 @@ void NDTScanMatcher::callbackRegularizationPose(
 
 void NDTScanMatcher::publishPartialPCDMap()
 {
-  pcl::PointCloud<PointTarget> map_pcl;
   using T = NormalDistributionsTransformOMPMultiVoxel<PointSource, PointTarget>;
   std::shared_ptr<T> ndt_omp_ptr = std::dynamic_pointer_cast<T>(ndt_ptr_);
-  ndt_omp_ptr->getVoxelPCD(map_pcl);
+  pcl::PointCloud<PointTarget> map_pcl = ndt_omp_ptr->getVoxelPCD();
 
   sensor_msgs::msg::PointCloud2 map_msg;
   pcl::toROSMsg(map_pcl, map_msg);
@@ -610,7 +603,8 @@ void NDTScanMatcher::callbackSensorPoints(
   pcl::transformPointCloud(
     *sensor_points_sensorTF_ptr, *sensor_points_baselinkTF_ptr, base_to_sensor_matrix);
   ndt_ptr_->setInputSource(sensor_points_baselinkTF_ptr);
-
+  backup_ndt_ptr_->setInputSource(sensor_points_baselinkTF_ptr); // KOJI is this really the best way?
+ 
   // start of critical section for initial_pose_msg_ptr_array_
   std::unique_lock<std::mutex> initial_pose_array_lock(initial_pose_array_mtx_);
   // check

@@ -25,6 +25,19 @@ NormalDistributionsTransformOMPMultiVoxel<PointSource, PointTarget>::NormalDistr
 {
 }
 
+// template <class PointSource, class PointTarget>
+// NormalDistributionsTransformOMPMultiVoxel<PointSource, PointTarget>::NormalDistributionsTransformOMPMultiVoxel(
+//   const NormalDistributionsTransformOMPMultiVoxel<PointSource, PointTarget> &obj)
+// {
+//   auto ndt_ptr_input = obj.getNDTPtr();
+//   ndt_ptr_->copyFrom(*ndt_ptr_input);
+//   // ndt_ptr_->setNumThreads(ndt_ptr_input->getNumThreads());
+//   // ndt_ptr_->setTransformationEpsilon(ndt_ptr_input->getTransformationEpsilon());
+//   // ndt_ptr_->setStepSize(ndt_ptr_input->getStepSize());
+//   // ndt_ptr_->setResolution(ndt_ptr_input->getResolution());
+//   // ndt_ptr_->setMaximumIterations(ndt_ptr_input->getMaximumIterations());
+// }
+
 template <class PointSource, class PointTarget>
 void NormalDistributionsTransformOMPMultiVoxel<PointSource, PointTarget>::align(
   pcl::PointCloud<PointSource> & output, const Eigen::Matrix4f & guess)
@@ -240,11 +253,16 @@ int NormalDistributionsTransformOMPMultiVoxel<PointSource, PointTarget>::getNumT
   return ndt_ptr_->getNumThreads();
 }
 
+// template <class PointSource, class PointTarget>
+// void NormalDistributionsTransformOMPMultiVoxel<PointSource, PointTarget>::getVoxelPCD(
+//   pcl::PointCloud<PointTarget> & output)
+// {
+//   ndt_ptr_->getVoxelPCD(output);
+// }
 template <class PointSource, class PointTarget>
-void NormalDistributionsTransformOMPMultiVoxel<PointSource, PointTarget>::getVoxelPCD(
-  pcl::PointCloud<PointTarget> & output)
+pcl::PointCloud<PointTarget> NormalDistributionsTransformOMPMultiVoxel<PointSource, PointTarget>::getVoxelPCD() const
 {
-  ndt_ptr_->getVoxelPCD(output);
+  return ndt_ptr_->getVoxelPCD();
 }
 
 // template <class PointSource, class PointTarget>
@@ -254,19 +272,24 @@ void NormalDistributionsTransformOMPMultiVoxel<PointSource, PointTarget>::getVox
 //   return ndt_ptr_->getNeighborhoodSearchMethod();
 // }
 
+// template <class PointSource, class PointTarget>
+// void NormalDistributionsTransformOMPMultiVoxel<PointSource, PointTarget>::getNDTPtr(
+//   pcl::shared_ptr<pclomp::NormalDistributionsTransformMultiVoxel<PointSource, PointTarget>> & output) const
+// {
+//   output = ndt_ptr_;
+// }
 template <class PointSource, class PointTarget>
-void NormalDistributionsTransformOMPMultiVoxel<PointSource, PointTarget>::getNDTPtr(
-  pcl::shared_ptr<pclomp::NormalDistributionsTransformMultiVoxel<PointSource, PointTarget>> & output) const
+pcl::shared_ptr<pclomp::NormalDistributionsTransformMultiVoxel<PointSource, PointTarget>> 
+  NormalDistributionsTransformOMPMultiVoxel<PointSource, PointTarget>::getNDTPtr() const
 {
-  output = ndt_ptr_;
+  return ndt_ptr_;
 }
 
 template <class PointSource, class PointTarget>
 void NormalDistributionsTransformOMPMultiVoxel<PointSource, PointTarget>::copyFrom(
   const NormalDistributionsTransformOMPMultiVoxel<PointSource, PointTarget> & input)
 {
-  pcl::shared_ptr<pclomp::NormalDistributionsTransformMultiVoxel<PointSource, PointTarget>> ndt_ptr_input;
-  input.getNDTPtr(ndt_ptr_input);
+  auto ndt_ptr_input = input.getNDTPtr();
   ndt_ptr_->copyFrom(*ndt_ptr_input);
   ndt_ptr_->setNumThreads(ndt_ptr_input->getNumThreads());
   ndt_ptr_->setTransformationEpsilon(ndt_ptr_input->getTransformationEpsilon());
@@ -277,7 +300,7 @@ void NormalDistributionsTransformOMPMultiVoxel<PointSource, PointTarget>::copyFr
 
 
 template <class PointSource, class PointTarget>
-std::vector<std::string> NormalDistributionsTransformOMPMultiVoxel<PointSource, PointTarget>::getCurrentMapIDs()
+std::vector<std::string> NormalDistributionsTransformOMPMultiVoxel<PointSource, PointTarget>::getCurrentMapIDs() const
 {
   return ndt_ptr_->getCurrentMapIDs();
 }

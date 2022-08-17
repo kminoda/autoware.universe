@@ -134,12 +134,9 @@ void copyNDT(
     std::shared_ptr<T> input_ndt_tmp_ptr = std::dynamic_pointer_cast<T>(input_ndt_ptr);
     std::shared_ptr<T> output_ndt_tmp_ptr = std::dynamic_pointer_cast<T>(output_ndt_ptr);
     output_ndt_tmp_ptr->copyFrom(*input_ndt_tmp_ptr);
-    // output_ndt_tmp_ptr->setNumThreads(input_ndt_tmp_ptr->getNumThreads());
-    // output_ndt_tmp_ptr->setTransformationEpsilon(input_ndt_tmp_ptr->getTransformationEpsilon());
-    // output_ndt_tmp_ptr->setStepSize(input_ndt_tmp_ptr->getStepSize());
-    // output_ndt_tmp_ptr->setResolution(input_ndt_tmp_ptr->getResolution());
-    // output_ndt_tmp_ptr->setMaximumIterations(input_ndt_tmp_ptr->getMaximumIterations());
-    *output_ndt_tmp_ptr = *input_ndt_tmp_ptr;
+
+    // T copied_ndt_tmp = *input_ndt_tmp_ptr;
+    // output_ndt_tmp_ptr = std::make_shared<T>(copied_ndt_tmp);
   } else {
     const std::string s = fmt::format("Unknown NDT type {}", static_cast<int>(ndt_mode));
     throw std::runtime_error(s);
@@ -177,6 +174,8 @@ private:
     geometry_msgs::msg::PoseWithCovarianceStamped::ConstSharedPtr pose_conv_msg_ptr);
   void callbackRegularizationPose(
     geometry_msgs::msg::PoseWithCovarianceStamped::ConstSharedPtr pose_conv_msg_ptr);
+  void callbackEKFOdom(nav_msgs::msg::Odometry::ConstSharedPtr odom_ptr);
+
   void publishPartialPCDMap();
   geometry_msgs::msg::PoseWithCovarianceStamped alignUsingMonteCarlo(
     const std::shared_ptr<NormalDistributionsTransformBase<PointSource, PointTarget>> & ndt_ptr,
@@ -205,13 +204,15 @@ private:
   void mapUpdateTimerCallback();
   void updateMap(const geometry_msgs::msg::Point & position);
   bool shouldUpdateMap(const geometry_msgs::msg::Point & position);
-  std::vector<std::string> getCurrentMapIDs();
+  std::vector<std::string> getCurrentMapIDs(
+    const std::shared_ptr<NormalDistributionsTransformBase<PointSource, PointTarget>> & ndt_ptr);
 
   rclcpp::Subscription<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr initial_pose_sub_;
   rclcpp::Subscription<autoware_map_msgs::msg::PCDMapArray>::SharedPtr map_points_sub_;
   rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr sensor_points_sub_;
   rclcpp::Subscription<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr
     regularization_pose_sub_;
+  rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr ekf_odom_sub_;
 
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr sensor_aligned_pose_pub_;
   rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr ndt_pose_pub_;
@@ -289,8 +290,10 @@ private:
   geometry_msgs::msg::Point::SharedPtr last_update_position_ptr_;
   double update_threshold_distance_;
   double loading_radius_;
+  geometry_msgs::msg::Point::SharedPtr ekf_latest_position_ptr_;
 
   bool map_update_in_progress_{false};
+  
   
 };
 

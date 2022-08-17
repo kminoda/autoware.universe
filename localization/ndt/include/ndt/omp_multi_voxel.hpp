@@ -30,6 +30,7 @@ class NormalDistributionsTransformOMPMultiVoxel
 {
 public:
   NormalDistributionsTransformOMPMultiVoxel();
+  // NormalDistributionsTransformOMPMultiVoxel(const NormalDistributionsTransformOMPMultiVoxel<PointSource, PointTarget> & obj);
   ~NormalDistributionsTransformOMPMultiVoxel() = default;
 
   void align(pcl::PointCloud<PointSource> & output, const Eigen::Matrix4f & guess) override;
@@ -78,10 +79,12 @@ public:
     const pcl::shared_ptr<pcl::PointCloud<PointTarget>> & map_ptr, const std::string map_id);
   void removeTarget(const std::string map_id);
   void createVoxelKdtree();
-  void getVoxelPCD(pcl::PointCloud<PointTarget> & output);
-  void getNDTPtr(pcl::shared_ptr<pclomp::NormalDistributionsTransformMultiVoxel<PointSource, PointTarget>> & output) const;
+  // void getVoxelPCD(pcl::PointCloud<PointTarget> & output);
+  // void getNDTPtr(pcl::shared_ptr<pclomp::NormalDistributionsTransformMultiVoxel<PointSource, PointTarget>> & output) const;
   void copyFrom(const NormalDistributionsTransformOMPMultiVoxel<PointSource, PointTarget> & input);
-  std::vector<std::string> getCurrentMapIDs();
+  pcl::shared_ptr<pclomp::NormalDistributionsTransformMultiVoxel<PointSource, PointTarget>> getNDTPtr() const;
+  pcl::PointCloud<PointTarget> getVoxelPCD() const;
+  std::vector<std::string> getCurrentMapIDs() const;
 
 private:
   pcl::shared_ptr<pclomp::NormalDistributionsTransformMultiVoxel<PointSource, PointTarget>> ndt_ptr_;
