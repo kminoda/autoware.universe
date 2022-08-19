@@ -81,6 +81,7 @@ public:
   void getVoxelPCD(pcl::PointCloud<PointTarget> & output);
   void getNDTPtr(pcl::shared_ptr<pclomp::NormalDistributionsTransformMultiVoxel<PointSource, PointTarget>> & output) const;
   void copyFrom(const NormalDistributionsTransformOMPMultiVoxel<PointSource, PointTarget> & input);
+  std::vector<std::string> getCurrentMapIDs();
 
 private:
   pcl::shared_ptr<pclomp::NormalDistributionsTransformMultiVoxel<PointSource, PointTarget>> ndt_ptr_;

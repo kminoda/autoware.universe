@@ -15,8 +15,11 @@
 #ifndef POSE_INITIALIZER__POSE_INITIALIZER_CORE_HPP_
 #define POSE_INITIALIZER__POSE_INITIALIZER_CORE_HPP_
 
-#include "autoware_map_msgs/srv/load_pcd_partially_for_publish.hpp"
-#include "autoware_map_msgs/msg/pcd_map_array.hpp"
+// #include "autoware_map_msgs/srv/load_pcd_partially_for_publish.hpp"
+// #include "autoware_map_msgs/msg/pcd_map_array.hpp"
+#include "autoware_map_msgs/srv/load_pcd_maps_general.hpp"
+#include "autoware_map_msgs/msg/area_info.hpp"
+#include "autoware_map_msgs/msg/pcd_map_with_id.hpp"
 
 #include <rclcpp/rclcpp.hpp>
 #include <tier4_api_utils/tier4_api_utils.hpp>
@@ -44,7 +47,7 @@ public:
 
 private:
   // void callbackMapPoints(sensor_msgs::msg::PointCloud2::ConstSharedPtr map_points_msg_ptr);
-  void callbackMapPoints(autoware_map_msgs::msg::PCDMapArray::ConstSharedPtr map_points_msg_ptr);
+  // void callbackMapPoints(autoware_map_msgs::msg::PCDMapArray::ConstSharedPtr map_points_msg_ptr);
   void serviceInitializePose(
     const tier4_localization_msgs::srv::PoseWithCovarianceStamped::Request::SharedPtr req,
     tier4_localization_msgs::srv::PoseWithCovarianceStamped::Response::SharedPtr res);
@@ -60,6 +63,7 @@ private:
       request_msg_ptr);  // NOLINT
   // void serviceResponseCallback(
   //   rclcpp::Client<autoware_map_msgs::srv::LoadPCDPartiallyForPublish>::SharedFuture future);
+  void callPCDLoader(geometry_msgs::msg::Point position, double radius);
 
   bool getHeight(
     const geometry_msgs::msg::PoseWithCovarianceStamped & input_pose_msg,
@@ -69,7 +73,7 @@ private:
 
   rclcpp::Subscription<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr gnss_pose_sub_;
   // rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr map_points_sub_;
-  rclcpp::Subscription<autoware_map_msgs::msg::PCDMapArray>::SharedPtr map_points_sub_;
+  // rclcpp::Subscription<autoware_map_msgs::msg::PCDMapArray>::SharedPtr map_points_sub_;
 
   // TODO(Takagi, Isamu): deprecated
   rclcpp::Subscription<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr initial_pose_sub_;
@@ -79,7 +83,8 @@ private:
   rclcpp::Publisher<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr initial_pose_pub_;
 
   rclcpp::Client<tier4_localization_msgs::srv::PoseWithCovarianceStamped>::SharedPtr ndt_client_;
-  rclcpp::Client<autoware_map_msgs::srv::LoadPCDPartiallyForPublish>::SharedPtr pcd_loader_client_;
+  // rclcpp::Client<autoware_map_msgs::srv::LoadPCDPartiallyForPublish>::SharedPtr pcd_loader_client_;
+  rclcpp::Client<autoware_map_msgs::srv::LoadPCDMapsGeneral>::SharedPtr pcd_loader_client_;
 
   rclcpp::CallbackGroup::SharedPtr initialize_pose_service_group_;
   rclcpp::CallbackGroup::SharedPtr pcd_loader_service_group_;
@@ -91,6 +96,8 @@ private:
 
   tf2::BufferCore tf2_buffer_;
   tf2_ros::TransformListener tf2_listener_;
+
+  geometry_msgs::msg::Point::SharedPtr last_update_position_ptr_;
 
   pcl::PointCloud<pcl::PointXYZ>::Ptr map_ptr_;
   std::string map_frame_;

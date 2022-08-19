@@ -37,6 +37,9 @@
 #include <autoware_map_msgs/msg/pcd_map_array.hpp>
 #include <tier4_localization_msgs/srv/pose_with_covariance_stamped.hpp>
 #include <visualization_msgs/msg/marker_array.hpp>
+#include "autoware_map_msgs/srv/load_pcd_maps_general.hpp"
+#include "autoware_map_msgs/msg/area_info.hpp"
+#include "autoware_map_msgs/msg/pcd_map_with_id.hpp"
 
 #include <fmt/format.h>
 #include <tf2/transform_datatypes.h>
@@ -65,6 +68,7 @@
 #include <string>
 #include <thread>
 #include <vector>
+#include <condition_variable>
 
 enum class NDTImplementType { PCL_GENERIC = 0, PCL_MODIFIED = 1, OMP = 2, OMP_MULTI_VOXEL = 3 };
 enum class ConvergedParamType {
@@ -132,6 +136,7 @@ void copyNDT(
     // output_ndt_tmp_ptr->setStepSize(input_ndt_tmp_ptr->getStepSize());
     // output_ndt_tmp_ptr->setResolution(input_ndt_tmp_ptr->getResolution());
     // output_ndt_tmp_ptr->setMaximumIterations(input_ndt_tmp_ptr->getMaximumIterations());
+    *output_ndt_tmp_ptr = *input_ndt_tmp_ptr;
   } else {
     const std::string s = fmt::format("Unknown NDT type {}", static_cast<int>(ndt_mode));
     throw std::runtime_error(s);
@@ -160,7 +165,10 @@ private:
     tier4_localization_msgs::srv::PoseWithCovarianceStamped::Response::SharedPtr res);
 
   // void callbackMapPoints(sensor_msgs::msg::PointCloud2::ConstSharedPtr pointcloud2_msg_ptr);
-  void callbackMapPoints(autoware_map_msgs::msg::PCDMapArray::ConstSharedPtr pcd_map_array_msg_ptr);
+  // void callbackMapPoints(autoware_map_msgs::msg::PCDMapArray::ConstSharedPtr pcd_map_array_msg_ptr);
+  std::vector<std::string> getMapIDsToRemove(const std::vector<std::string> & map_ids_ndt_will_possess);
+  void updateNDT(const std::vector<autoware_map_msgs::msg::PCDMapWithID> & maps_to_add,
+    const std::vector<std::string> & map_ids_to_remove);
   void callbackSensorPoints(sensor_msgs::msg::PointCloud2::ConstSharedPtr pointcloud2_msg_ptr);
   void callbackInitialPose(
     geometry_msgs::msg::PoseWithCovarianceStamped::ConstSharedPtr pose_conv_msg_ptr);
@@ -190,10 +198,14 @@ private:
     const rclcpp::Time & sensor_ros_time);
 
   void timerDiagnostic();
-  bool validateInitialPositionCompatibility(const geometry_msgs::msg::Point & initial_point);
+  bool hasCompatibleMap(const geometry_msgs::msg::Point & initial_point);
 
   // void publishPartialPCDMap(
   //   const autoware_map_msgs::msg::PCDMapArray::SharedPtr pcd_map_array_msg_ptr);
+
+  void mapUpdateTimerCallback();
+  void updateMap(const geometry_msgs::msg::Point & position);
+  bool shouldUpdateMap(const geometry_msgs::msg::Point & position);
 
   rclcpp::Subscription<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr initial_pose_sub_;
   // rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr map_points_sub_;
@@ -227,6 +239,8 @@ private:
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr koji_map_pub_;
 
   rclcpp::Service<tier4_localization_msgs::srv::PoseWithCovarianceStamped>::SharedPtr service_;
+  rclcpp::Client<autoware_map_msgs::srv::LoadPCDMapsGeneral>::SharedPtr pcd_loader_client_;
+  rclcpp::TimerBase::SharedPtr map_update_timer_;
 
   tf2_ros::Buffer tf2_buffer_;
   tf2_ros::TransformListener tf2_listener_;
@@ -270,6 +284,14 @@ private:
   const float regularization_scale_factor_;
   std::deque<geometry_msgs::msg::PoseWithCovarianceStamped::ConstSharedPtr>
     regularization_pose_msg_ptr_array_;
+
+  std::mutex pcd_loader_client_mutex_;
+  std::condition_variable condition_;
+  bool value_ready_ = false;
+  geometry_msgs::msg::Point::SharedPtr last_update_position_ptr_;
+  double update_threshold_distance_;
+  double loading_radius_;
+  
 };
 
 #endif  // NDT_SCAN_MATCHER__NDT_SCAN_MATCHER_CORE_HPP_

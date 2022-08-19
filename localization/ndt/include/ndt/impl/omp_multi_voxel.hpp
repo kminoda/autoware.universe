@@ -276,4 +276,10 @@ void NormalDistributionsTransformOMPMultiVoxel<PointSource, PointTarget>::copyFr
 }
 
 
+template <class PointSource, class PointTarget>
+std::vector<std::string> NormalDistributionsTransformOMPMultiVoxel<PointSource, PointTarget>::getCurrentMapIDs()
+{
+  return ndt_ptr_->getCurrentMapIDs();
+}
+
 #endif  // NDT__IMPL__OMP_MULTI_VOXEL_HPP_

@@ -33,6 +33,9 @@
 
 #include "autoware_map_msgs/srv/load_pcd_partially.hpp"
 #include "autoware_map_msgs/srv/load_pcd_partially_for_publish.hpp"
+#include "autoware_map_msgs/srv/load_pcd_maps_general.hpp"
+#include "autoware_map_msgs/msg/area_info.hpp"
+#include "autoware_map_msgs/msg/pcd_map_with_id.hpp"
 
 #include <rclcpp/rclcpp.hpp>
 
@@ -90,6 +93,8 @@ private:
   rclcpp::Service<autoware_map_msgs::srv::LoadPCDPartially>::SharedPtr load_pcd_partially_service_;
   rclcpp::Service<autoware_map_msgs::srv::LoadPCDPartiallyForPublish>::SharedPtr
     load_pcd_partially_for_publish_service_;
+  rclcpp::Service<autoware_map_msgs::srv::LoadPCDMapsGeneral>::SharedPtr
+    load_pcd_maps_general_service_;
 
   sensor_msgs::msg::PointCloud2 loadPCDFiles(const std::vector<std::string> & pcd_paths);
   struct PCDFileMetadata
@@ -99,25 +104,35 @@ private:
   };
   std::map<std::string, PCDFileMetadata> current_pcd_file_metadata_dict_;
   std::map<std::string, PCDFileMetadata> all_pcd_file_metadata_dict_;
-  void generatePCDMetadata(
-    const std::vector<std::string> & pcd_paths);
-
+  void generatePCDMetadata(const std::vector<std::string> & pcd_paths);
+  void areaLoad(autoware_map_msgs::msg::AreaInfo area,
+    autoware_map_msgs::srv::LoadPCDMapsGeneral::Response::SharedPtr & response);
+  void differentialLoad(autoware_map_msgs::msg::AreaInfo area_info,
+    std::vector<std::string> already_loaded_ids,
+    autoware_map_msgs::srv::LoadPCDMapsGeneral::Response::SharedPtr & response);
+  bool loadPCDMapsGeneralCallback(
+    autoware_map_msgs::srv::LoadPCDMapsGeneral::Request::SharedPtr req,
+    autoware_map_msgs::srv::LoadPCDMapsGeneral::Response::SharedPtr res);
+  void loadPCDMapWithID(std::string path, std::string map_id,
+    autoware_map_msgs::msg::PCDMapWithID & pcd_map_with_id);
+  bool isGridWithinQueriedArea(autoware_map_msgs::msg::AreaInfo area_info, PCDFileMetadata metadata);
   // sensor_msgs::msg::PointCloud2 loadPCDPartially(
   //   const geometry_msgs::msg::Point position, const float radius,
   //   std::vector<PCDFileMetadata> pcd_file_metadata_array) const;
 
-  autoware_map_msgs::msg::PCDMapArray loadPCDPartially(
-    const geometry_msgs::msg::Point position, const float radius);
+  // autoware_map_msgs::msg::PCDMapArray loadPCDPartially(
+  //   const geometry_msgs::msg::Point position, const float radius);
 
-  bool updateLoadedMaps(
-    const geometry_msgs::msg::Point position, const float radius);
-  bool loadPCDPartiallyForPublishServiceCallback(
-    autoware_map_msgs::srv::LoadPCDPartiallyForPublish::Request::SharedPtr req,
-    autoware_map_msgs::srv::LoadPCDPartiallyForPublish::Response::SharedPtr res);
-  bool loadPCDPartiallyServiceCallback(
-    autoware_map_msgs::srv::LoadPCDPartially::Request::SharedPtr req,
-    autoware_map_msgs::srv::LoadPCDPartially::Response::SharedPtr res);
+  // bool updateLoadedMaps(
+  //   const geometry_msgs::msg::Point position, const float radius);
+  // bool loadPCDPartiallyForPublishServiceCallback(
+  //   autoware_map_msgs::srv::LoadPCDPartiallyForPublish::Request::SharedPtr req,
+  //   autoware_map_msgs::srv::LoadPCDPartiallyForPublish::Response::SharedPtr res);
+  // bool loadPCDPartiallyServiceCallback(
+  //   autoware_map_msgs::srv::LoadPCDPartially::Request::SharedPtr req,
+  //   autoware_map_msgs::srv::LoadPCDPartially::Response::SharedPtr res);
   void generateTF(sensor_msgs::msg::PointCloud2 & pcd_msg);
+
 };
 
 #endif  // MAP_LOADER__POINTCLOUD_MAP_LOADER_NODE_HPP_

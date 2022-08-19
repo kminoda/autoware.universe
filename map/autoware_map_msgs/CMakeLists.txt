@@ -16,10 +16,16 @@ find_package(PCL REQUIRED)
 ament_auto_find_build_dependencies()
 
 rosidl_generate_interfaces(${PROJECT_NAME}
+  "msg/AreaInfo.msg"
   "msg/PCDMap.msg"
+  "msg/PCDMapWithID.msg"
   "msg/PCDMapArray.msg"
+  "msg/PCDMetaInfo.msg"
+  "msg/PCDMetaInfoArray.msg"
+  "srv/LoadPCDGrids.srv"
   "srv/LoadPCDPartially.srv"
   "srv/LoadPCDPartiallyForPublish.srv"
+  "srv/LoadPCDMapsGeneral.srv"
   DEPENDENCIES
     std_msgs
     geometry_msgs
