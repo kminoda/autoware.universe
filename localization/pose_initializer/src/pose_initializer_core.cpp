@@ -210,7 +210,8 @@ void PoseInitializer::callbackInitialPose(
   geometry_msgs::msg::PoseWithCovarianceStamped::ConstSharedPtr pose_cov_msg_ptr)
 {
   enable_gnss_callback_ = false;  // get only first topic
-  std::cout << "called initialpose" << std::endl;
+
+  callPCDLoader(pose_cov_msg_ptr->pose.pose.position, radius_to_load_map_);
 
   auto add_height_pose_msg_ptr = std::make_shared<geometry_msgs::msg::PoseWithCovarianceStamped>();
   getHeight(*pose_cov_msg_ptr, add_height_pose_msg_ptr);
@@ -222,8 +223,6 @@ void PoseInitializer::callbackInitialPose(
   } catch (tf2::TransformException & exception) {
     RCLCPP_WARN_STREAM(get_logger(), "failed to lookup transform: " << exception.what());
   }
-
-  callPCDLoader(add_height_pose_msg_ptr->pose.pose.position, radius_to_load_map_);
 
   add_height_pose_msg_ptr->pose.covariance = initialpose_particle_covariance_;
 
@@ -240,6 +239,8 @@ void PoseInitializer::callbackGNSSPoseCov(
     return;
   }
 
+  callPCDLoader(pose_cov_msg_ptr->pose.pose.position, radius_to_load_map_);
+
   // TODO(YamatoAndo) check service is available
 
   auto add_height_pose_msg_ptr = std::make_shared<geometry_msgs::msg::PoseWithCovarianceStamped>();
@@ -252,8 +253,6 @@ void PoseInitializer::callbackGNSSPoseCov(
   } catch (tf2::TransformException & exception) {
     RCLCPP_WARN_STREAM(get_logger(), "failed to lookup transform: " << exception.what());
   }
-
-  callPCDLoader(add_height_pose_msg_ptr->pose.pose.position, radius_to_load_map_);
 
   add_height_pose_msg_ptr->pose.covariance = gnss_particle_covariance_;
 

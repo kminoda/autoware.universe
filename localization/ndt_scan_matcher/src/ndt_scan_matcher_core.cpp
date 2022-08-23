@@ -303,7 +303,7 @@ NDTScanMatcher::NDTScanMatcher()
     RCLCPP_INFO(get_logger(), "Waiting for pcd loader service...");
   }
   last_update_position_ptr_ = nullptr;
-  update_threshold_distance_ = 5; // TODO koji minoda kokoyabai
+  update_threshold_distance_ = 10; // TODO koji minoda kokoyabai
   loading_radius_ = 100; // TODO koji minoda kokoyabai
 
   double map_update_dt = 1.0;
@@ -399,26 +399,26 @@ void NDTScanMatcher::serviceNDTAlign(
 
 void NDTScanMatcher::mapUpdateTimerCallback()
 {
-  // get the current position
-  geometry_msgs::msg::Point current_position;
-  try {
-    geometry_msgs::msg::TransformStamped current_trans = tf2_buffer_.lookupTransform(
-      "map", "base_link", tf2::TimePointZero, tf2::durationFromSec(1.0));
-      current_position.x = current_trans.transform.translation.x;
-      current_position.y = current_trans.transform.translation.y;
-      current_position.z = current_trans.transform.translation.z;
-  } catch (tf2::TransformException & ex) {
-    RCLCPP_WARN(
-      get_logger(), "Could NOT transform pose %s frame to %s frame : %s", "map", "base_link",
-      ex.what());
-    return;
-  }
+  // // get the current position
+  // geometry_msgs::msg::Point current_position;
+  // try {
+  //   geometry_msgs::msg::TransformStamped current_trans = tf2_buffer_.lookupTransform(
+  //     "map", "base_link", tf2::TimePointZero, tf2::durationFromSec(1.0));
+  //     current_position.x = current_trans.transform.translation.x;
+  //     current_position.y = current_trans.transform.translation.y;
+  //     current_position.z = current_trans.transform.translation.z;
+  // } catch (tf2::TransformException & ex) {
+  //   RCLCPP_WARN(
+  //     get_logger(), "Could NOT transform pose %s frame to %s frame : %s", "map", "base_link",
+  //     ex.what());
+  //   return;
+  // }
 
-  // continue only if we should update the map
-  if (shouldUpdateMap(current_position))
-  {
-    updateMap(current_position);
-  }
+  // // continue only if we should update the map
+  // if (shouldUpdateMap(current_position))
+  // {
+  //   updateMap(current_position);
+  // }
 }
 
 bool NDTScanMatcher::shouldUpdateMap(const geometry_msgs::msg::Point & position)
@@ -481,7 +481,8 @@ std::vector<std::string> NDTScanMatcher::getMapIDsToRemove(
 std::vector<std::string> NDTScanMatcher::getCurrentMapIDs()
 {
   using T = NormalDistributionsTransformOMPMultiVoxel<PointSource, PointTarget>;
-  std::shared_ptr<T> ndt_omp_ptr = std::dynamic_pointer_cast<T>(ndt_ptr_);
+  // std::shared_ptr<T> ndt_omp_ptr = std::dynamic_pointer_cast<T>(ndt_ptr_);
+  std::shared_ptr<T> ndt_omp_ptr = std::dynamic_pointer_cast<T>(backup_ndt_ptr_);
   return ndt_omp_ptr->getCurrentMapIDs();
 }
 

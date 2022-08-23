@@ -54,6 +54,9 @@
 #include <tf2_ros/transform_broadcaster.h>
 #include <tf2_ros/transform_listener.h>
 
+#include <tf2/LinearMath/Quaternion.h> // KOJI
+#include <tf2/utils.h> // KOJI 
+
 #ifdef ROS_DISTRO_GALACTIC
 #include <tf2_sensor_msgs/tf2_sensor_msgs.h>
 #else
@@ -198,10 +201,6 @@ private:
     const rclcpp::Time & sensor_ros_time);
 
   void timerDiagnostic();
-  // bool hasCompatibleMap(const geometry_msgs::msg::Point & initial_point);
-
-  // void publishPartialPCDMap(
-  //   const autoware_map_msgs::msg::PCDMapArray::SharedPtr pcd_map_array_msg_ptr);
 
   void mapUpdateTimerCallback();
   void updateMap(const geometry_msgs::msg::Point & position);
@@ -209,7 +208,6 @@ private:
   std::vector<std::string> getCurrentMapIDs();
 
   rclcpp::Subscription<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr initial_pose_sub_;
-  // rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr map_points_sub_;
   rclcpp::Subscription<autoware_map_msgs::msg::PCDMapArray>::SharedPtr map_points_sub_;
   rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr sensor_points_sub_;
   rclcpp::Subscription<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr
@@ -274,8 +272,6 @@ private:
   std::mutex initial_pose_array_mtx_;
 
   OMPParams omp_params_;
-
-  // double min_x_{0}, min_y_{0}, max_x_{0}, max_y_{0};
 
   std::thread diagnostic_thread_;
   std::map<std::string, std::string> key_value_stdmap_;
