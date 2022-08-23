@@ -17,7 +17,7 @@
 #ifndef MAP_PROVIDER__MAP_PROVIDER_CORE_HPP_
 #define MAP_PROVIDER__MAP_PROVIDER_CORE_HPP_
 
-#include "autoware_map_msgs/srv/load_pcd_partially.hpp"
+#include "autoware_map_msgs/srv/load_pcd_partially_for_publish.hpp"
 #include "autoware_map_msgs/msg/pcd_map_array.hpp"
 
 #include <rclcpp/rclcpp.hpp>
@@ -46,10 +46,10 @@ private:
   float pointcloud_map_radius_;
   float update_threshold_distance_;
 
-  autoware_map_msgs::srv::LoadPCDPartially::Response::SharedPtr pcd_loader_res_;
+  autoware_map_msgs::srv::LoadPCDPartiallyForPublish::Response::SharedPtr pcd_loader_res_;
 
   rclcpp::Publisher<autoware_map_msgs::msg::PCDMapArray>::SharedPtr maps_pub_;
-  rclcpp::Client<autoware_map_msgs::srv::LoadPCDPartially>::SharedPtr pcd_loader_client_;
+  rclcpp::Client<autoware_map_msgs::srv::LoadPCDPartiallyForPublish>::SharedPtr pcd_loader_client_;
   // rclcpp::TimerBase::SharedPtr update_map_timer_;
   rclcpp::TimerBase::SharedPtr timer_;
 

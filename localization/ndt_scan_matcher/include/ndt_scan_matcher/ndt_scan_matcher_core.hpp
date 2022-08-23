@@ -167,7 +167,7 @@ private:
   // void callbackMapPoints(sensor_msgs::msg::PointCloud2::ConstSharedPtr pointcloud2_msg_ptr);
   // void callbackMapPoints(autoware_map_msgs::msg::PCDMapArray::ConstSharedPtr pcd_map_array_msg_ptr);
   std::vector<std::string> getMapIDsToRemove(const std::vector<std::string> & map_ids_ndt_will_possess);
-  void updateNDT(const std::vector<autoware_map_msgs::msg::PCDMapWithID> & maps_to_add,
+  void updateNdtWithNewMap(const std::vector<autoware_map_msgs::msg::PCDMapWithID> & maps_to_add,
     const std::vector<std::string> & map_ids_to_remove);
   void callbackSensorPoints(sensor_msgs::msg::PointCloud2::ConstSharedPtr pointcloud2_msg_ptr);
   void callbackInitialPose(
@@ -198,7 +198,7 @@ private:
     const rclcpp::Time & sensor_ros_time);
 
   void timerDiagnostic();
-  bool hasCompatibleMap(const geometry_msgs::msg::Point & initial_point);
+  // bool hasCompatibleMap(const geometry_msgs::msg::Point & initial_point);
 
   // void publishPartialPCDMap(
   //   const autoware_map_msgs::msg::PCDMapArray::SharedPtr pcd_map_array_msg_ptr);
@@ -206,6 +206,7 @@ private:
   void mapUpdateTimerCallback();
   void updateMap(const geometry_msgs::msg::Point & position);
   bool shouldUpdateMap(const geometry_msgs::msg::Point & position);
+  std::vector<std::string> getCurrentMapIDs();
 
   rclcpp::Subscription<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr initial_pose_sub_;
   // rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr map_points_sub_;
@@ -274,7 +275,7 @@ private:
 
   OMPParams omp_params_;
 
-  double min_x_{0}, min_y_{0}, max_x_{0}, max_y_{0};
+  // double min_x_{0}, min_y_{0}, max_x_{0}, max_y_{0};
 
   std::thread diagnostic_thread_;
   std::map<std::string, std::string> key_value_stdmap_;
@@ -286,11 +287,14 @@ private:
     regularization_pose_msg_ptr_array_;
 
   std::mutex pcd_loader_client_mutex_;
+  std::mutex initial_pose_pcd_loader_client_mutex_;
   std::condition_variable condition_;
   bool value_ready_ = false;
   geometry_msgs::msg::Point::SharedPtr last_update_position_ptr_;
   double update_threshold_distance_;
   double loading_radius_;
+
+  bool map_update_in_progress_{false};
   
 };
 

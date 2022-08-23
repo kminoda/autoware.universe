@@ -259,13 +259,11 @@ void PointCloudMapLoaderNode::loadPCDMapWithID(
   pcd_map_with_id.id = map_id;
 }
 
-void PointCloudMapLoaderNode::differentialLoad(
+void PointCloudMapLoaderNode::differentialAreaLoad(
   autoware_map_msgs::msg::AreaInfo area,
   std::vector<std::string> already_loaded_ids,
   autoware_map_msgs::srv::LoadPCDMapsGeneral::Response::SharedPtr & response)
 {
-  RCLCPP_INFO_STREAM(get_logger(), "Differential area loading");
-
   // iterate over all the available pcd map grids
   for (const auto & ele : all_pcd_file_metadata_dict_) {
     std::string path = ele.first;
@@ -286,15 +284,15 @@ void PointCloudMapLoaderNode::differentialLoad(
       response->loaded_pcds.push_back(pcd_map_with_id);
     }
   }
+  RCLCPP_INFO_STREAM(get_logger(), "Finished diff area loading");
 }
 
-void PointCloudMapLoaderNode::areaLoad(
+void PointCloudMapLoaderNode::partialAreaLoad(
   autoware_map_msgs::msg::AreaInfo area,
   autoware_map_msgs::srv::LoadPCDMapsGeneral::Response::SharedPtr & response)
 {
-  RCLCPP_INFO_STREAM(get_logger(), "Area loading");
   // iterate over all the available pcd map grids
-  
+
   for (const auto & ele : all_pcd_file_metadata_dict_) {
     std::string path = ele.first;
     PCDFileMetadata metadata = ele.second;
@@ -309,7 +307,6 @@ void PointCloudMapLoaderNode::areaLoad(
     loadPCDMapWithID(path, map_id, pcd_map_with_id);
     response->loaded_pcds.push_back(pcd_map_with_id);
   }
-  RCLCPP_INFO_STREAM(get_logger(), "Finished area loading. Loaded pcd size: " << response->loaded_pcds.size());
 }
 
 bool PointCloudMapLoaderNode::loadPCDMapsGeneralCallback(
@@ -319,11 +316,11 @@ bool PointCloudMapLoaderNode::loadPCDMapsGeneralCallback(
   int mode = req->mode;
   if (mode == 0) {
     auto area = req->area;
-    areaLoad(area, res);
+    partialAreaLoad(area, res);
   } else if (mode == 1) {
     auto area = req->area;
     std::vector<std::string> already_loaded_ids = req->already_loaded_ids;
-    differentialLoad(area, already_loaded_ids, res);
+    differentialAreaLoad(area, already_loaded_ids, res);
   }
   return true;
 }

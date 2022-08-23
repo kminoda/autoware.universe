@@ -105,9 +105,9 @@ private:
   std::map<std::string, PCDFileMetadata> current_pcd_file_metadata_dict_;
   std::map<std::string, PCDFileMetadata> all_pcd_file_metadata_dict_;
   void generatePCDMetadata(const std::vector<std::string> & pcd_paths);
-  void areaLoad(autoware_map_msgs::msg::AreaInfo area,
+  void partialAreaLoad(autoware_map_msgs::msg::AreaInfo area,
     autoware_map_msgs::srv::LoadPCDMapsGeneral::Response::SharedPtr & response);
-  void differentialLoad(autoware_map_msgs::msg::AreaInfo area_info,
+  void differentialAreaLoad(autoware_map_msgs::msg::AreaInfo area_info,
     std::vector<std::string> already_loaded_ids,
     autoware_map_msgs::srv::LoadPCDMapsGeneral::Response::SharedPtr & response);
   bool loadPCDMapsGeneralCallback(

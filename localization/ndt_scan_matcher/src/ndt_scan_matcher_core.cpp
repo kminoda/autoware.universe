@@ -105,9 +105,9 @@ bool isLocalOptimalSolutionOscillation(
 }
 
 template <typename T, typename U>
-bool calculateDistance(const T p1, const U p2)
+double calculateDistance(const T p1, const U p2)
 {
-  return std::pow(p1.x - p2.x, 2.0) + std::pow(p1.y - p2.y, 2.0) + std::pow(p1.z - p2.z, 2.0);
+  return std::sqrt(std::pow(p1.x - p2.x, 2.0) + std::pow(p1.y - p2.y, 2.0));
 }
 
 NDTScanMatcher::NDTScanMatcher()
@@ -286,12 +286,6 @@ NDTScanMatcher::NDTScanMatcher()
     this->create_publisher<visualization_msgs::msg::MarkerArray>(
       "monte_carlo_initial_pose_marker", 10);
 
-  double map_update_dt = 1.0;
-  auto period_ns =
-    std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::duration<double>(map_update_dt));
-  map_update_timer_ = rclcpp::create_timer(
-    this, get_clock(), period_ns, std::bind(&NDTScanMatcher::mapUpdateTimerCallback, this));
-
   diagnostics_pub_ =
     this->create_publisher<diagnostic_msgs::msg::DiagnosticArray>("/diagnostics", 10);
 
@@ -303,15 +297,20 @@ NDTScanMatcher::NDTScanMatcher()
     std::bind(&NDTScanMatcher::serviceNDTAlign, this, std::placeholders::_1, std::placeholders::_2),
     rclcpp::ServicesQoS().get_rmw_qos_profile(), main_callback_group);
 
-  // TODO (koji minoda): maybe multi threading necessary?
   pcd_loader_client_ = this->create_client<autoware_map_msgs::srv::LoadPCDMapsGeneral>(
     "pcd_loader_service", rmw_qos_profile_services_default);
   while (!pcd_loader_client_->wait_for_service(std::chrono::seconds(1)) && rclcpp::ok()) {
     RCLCPP_INFO(get_logger(), "Waiting for pcd loader service...");
   }
   last_update_position_ptr_ = nullptr;
-  update_threshold_distance_ = 20; // TODO koji minoda kokoyabai
+  update_threshold_distance_ = 5; // TODO koji minoda kokoyabai
   loading_radius_ = 100; // TODO koji minoda kokoyabai
+
+  double map_update_dt = 1.0;
+  auto period_ns =
+    std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::duration<double>(map_update_dt));
+  map_update_timer_ = rclcpp::create_timer(
+    this, get_clock(), period_ns, std::bind(&NDTScanMatcher::mapUpdateTimerCallback, this), main_callback_group);
 
   diagnostic_thread_ = std::thread(&NDTScanMatcher::timerDiagnostic, this);
   diagnostic_thread_.detach();
@@ -368,62 +367,34 @@ void NDTScanMatcher::timerDiagnostic()
   }
 }
 
-bool NDTScanMatcher::shouldUpdateMap(const geometry_msgs::msg::Point & position)
+void NDTScanMatcher::serviceNDTAlign(
+  const tier4_localization_msgs::srv::PoseWithCovarianceStamped::Request::SharedPtr req,
+  tier4_localization_msgs::srv::PoseWithCovarianceStamped::Response::SharedPtr res)
 {
-  if (last_update_position_ptr_ == nullptr) return true;
-  double distance = calculateDistance(position, *last_update_position_ptr_);
-  return distance > update_threshold_distance_;
-}
+  // get TF from pose_frame to map_frame
+  auto TF_pose_to_map_ptr = std::make_shared<geometry_msgs::msg::TransformStamped>();
+  getTransform(map_frame_, req->pose_with_covariance.header.frame_id, TF_pose_to_map_ptr);
 
-std::vector<std::string> NDTScanMatcher::getMapIDsToRemove(
-  const std::vector<std::string> & map_ids_ndt_will_possess)
-{
-  std::vector<std::string> map_ids_to_remove;
-  using T = NormalDistributionsTransformOMPMultiVoxel<PointSource, PointTarget>;
-  std::shared_ptr<T> ndt_omp_ptr = std::dynamic_pointer_cast<T>(ndt_ptr_);
-  std::vector<std::string> current_map_ids = ndt_omp_ptr->getCurrentMapIDs();
-  for (std::string current_map_id: current_map_ids)
-  {
-    bool should_remove = std::find(map_ids_ndt_will_possess.begin(), map_ids_ndt_will_possess.end(), current_map_id) == map_ids_ndt_will_possess.end();
-    if (!should_remove) continue;
-    map_ids_to_remove.push_back(current_map_id);
+  // transform pose_frame to map_frame
+  const auto mapTF_initial_pose_msg = transform(req->pose_with_covariance, *TF_pose_to_map_ptr);
+  updateMap(mapTF_initial_pose_msg.pose.pose.position);
+
+  if (ndt_ptr_->getInputSource() == nullptr) {
+    res->success = false;
+    res->seq = req->seq;
+    RCLCPP_WARN(get_logger(), "No InputSource");
+    return;
   }
-  return map_ids_to_remove;
-}
 
-void NDTScanMatcher::updateMap(const geometry_msgs::msg::Point & position)
-{
-  // create a loading request with mode = 1
-  auto request = std::make_shared<autoware_map_msgs::srv::LoadPCDMapsGeneral::Request>();
-  request->mode = 1; // differential load
-  request->area.center = position;
-  request->area.radius = loading_radius_;
-  request->already_loaded_ids = std::vector<std::string>(); // TODO
+  // mutex Map
+  std::lock_guard<std::mutex> lock(ndt_map_mtx_);
 
-  // send a request to map_loader
-  auto result{pcd_loader_client_->async_send_request(
-    request,
-    [this](const rclcpp::Client<autoware_map_msgs::srv::LoadPCDMapsGeneral>::SharedFuture
-             response) {
-      (void)response;
-      std::lock_guard<std::mutex> lock{pcd_loader_client_mutex_};
-      value_ready_ = true;
-      condition_.notify_all();
-    })};
-  std::unique_lock<std::mutex> lock{pcd_loader_client_mutex_};
-  condition_.wait(lock, [this]() { return value_ready_; });
-
-  // call callbackMapPoints()
-  std::vector<std::string> map_ids_ndt_will_possess = std::vector<std::string>();
-  for (const std::string & map_id: result.get()->already_loaded_ids) {
-    map_ids_ndt_will_possess.push_back(map_id);
-  }
-  for (const auto & map_with_id: result.get()->loaded_pcds) {
-    map_ids_ndt_will_possess.push_back(map_with_id.id);
-  }
-  std::vector<std::string> map_ids_to_remove = getMapIDsToRemove(map_ids_ndt_will_possess);
-  updateNDT(result.get()->loaded_pcds, map_ids_to_remove);
-  last_update_position_ptr_ = std::make_shared<geometry_msgs::msg::Point>(position);
+  key_value_stdmap_["state"] = "Aligning";
+  res->pose_with_covariance = alignUsingMonteCarlo(ndt_ptr_, mapTF_initial_pose_msg);
+  key_value_stdmap_["state"] = "Sleeping";
+  res->success = true;
+  res->seq = req->seq;
+  res->pose_with_covariance.pose.covariance = req->pose_with_covariance.pose.covariance;
 }
 
 void NDTScanMatcher::mapUpdateTimerCallback()
@@ -444,41 +415,125 @@ void NDTScanMatcher::mapUpdateTimerCallback()
   }
 
   // continue only if we should update the map
-  if (shouldUpdateMap(current_position)) updateMap(current_position);
+  if (shouldUpdateMap(current_position))
+  {
+    updateMap(current_position);
+  }
 }
 
-void NDTScanMatcher::serviceNDTAlign(
-  const tier4_localization_msgs::srv::PoseWithCovarianceStamped::Request::SharedPtr req,
-  tier4_localization_msgs::srv::PoseWithCovarianceStamped::Response::SharedPtr res)
+bool NDTScanMatcher::shouldUpdateMap(const geometry_msgs::msg::Point & position)
 {
-  // get TF from pose_frame to map_frame
-  auto TF_pose_to_map_ptr = std::make_shared<geometry_msgs::msg::TransformStamped>();
-  getTransform(map_frame_, req->pose_with_covariance.header.frame_id, TF_pose_to_map_ptr);
+  if (last_update_position_ptr_ == nullptr) return false;
+  double distance = calculateDistance(position, *last_update_position_ptr_);
+  return distance > update_threshold_distance_;
+}
 
-  // transform pose_frame to map_frame
-  const auto mapTF_initial_pose_msg = transform(req->pose_with_covariance, *TF_pose_to_map_ptr);
+void NDTScanMatcher::updateMap(const geometry_msgs::msg::Point & position)
+{
+  // create a loading request with mode = 1
+  auto request = std::make_shared<autoware_map_msgs::srv::LoadPCDMapsGeneral::Request>();
+  request->mode = 1; // differential load
+  request->area.center = position;
+  request->area.radius = loading_radius_;
+  request->already_loaded_ids = getCurrentMapIDs();
 
-  if (!hasCompatibleMap(mapTF_initial_pose_msg.pose.pose.position)) {
-    updateMap(mapTF_initial_pose_msg.pose.pose.position);
+  // send a request to map_loader
+  auto result{pcd_loader_client_->async_send_request(
+    request,
+    [this](const rclcpp::Client<autoware_map_msgs::srv::LoadPCDMapsGeneral>::SharedFuture
+            response) {
+      (void)response;
+      std::lock_guard<std::mutex> lock{pcd_loader_client_mutex_};
+      value_ready_ = true;
+      condition_.notify_all();
+    })};
+  std::unique_lock<std::mutex> lock{pcd_loader_client_mutex_};
+  condition_.wait(lock, [this]() { return value_ready_; });
+
+  // call callbackMapPoints()
+  std::vector<std::string> map_ids_ndt_will_possess = std::vector<std::string>();
+  for (const std::string & map_id: result.get()->already_loaded_ids) {
+    map_ids_ndt_will_possess.push_back(map_id);
   }
+  for (const auto & map_with_id: result.get()->loaded_pcds) {
+    map_ids_ndt_will_possess.push_back(map_with_id.id);
+  }
+  std::vector<std::string> map_ids_to_remove = getMapIDsToRemove(map_ids_ndt_will_possess);
 
-  if (ndt_ptr_->getInputSource() == nullptr) {
-    res->success = false;
-    res->seq = req->seq;
-    RCLCPP_WARN(get_logger(), "No InputSource");
+  updateNdtWithNewMap(result.get()->loaded_pcds, map_ids_to_remove);
+  last_update_position_ptr_ = std::make_shared<geometry_msgs::msg::Point>(position);
+}
+
+std::vector<std::string> NDTScanMatcher::getMapIDsToRemove(
+  const std::vector<std::string> & map_ids_ndt_will_possess)
+{
+  std::vector<std::string> map_ids_to_remove;
+  std::vector<std::string> current_map_ids = getCurrentMapIDs();
+  for (std::string current_map_id: current_map_ids)
+  {
+    bool should_remove = std::find(map_ids_ndt_will_possess.begin(), map_ids_ndt_will_possess.end(), current_map_id) == map_ids_ndt_will_possess.end();
+    if (!should_remove) continue;
+    map_ids_to_remove.push_back(current_map_id);
+  }
+  return map_ids_to_remove;
+}
+
+std::vector<std::string> NDTScanMatcher::getCurrentMapIDs()
+{
+  using T = NormalDistributionsTransformOMPMultiVoxel<PointSource, PointTarget>;
+  std::shared_ptr<T> ndt_omp_ptr = std::dynamic_pointer_cast<T>(ndt_ptr_);
+  return ndt_omp_ptr->getCurrentMapIDs();
+}
+
+void NDTScanMatcher::updateNdtWithNewMap(
+  const std::vector<autoware_map_msgs::msg::PCDMapWithID> & maps_to_add,
+  const std::vector<std::string> & map_ids_to_remove)
+{
+  std::cout << "Received a map! add: " << int(maps_to_add.size()) << ", remove: " << int(map_ids_to_remove.size()) << std::endl;
+  if ((int(maps_to_add.size()) == 0) & (int(map_ids_to_remove.size()) == 0)) {
+    std::cout << "No map update" << std::endl;
     return;
   }
 
-  // mutex Map
-  std::lock_guard<std::mutex> lock(ndt_map_mtx_);
+  const auto KOJI_exe_start_time = std::chrono::system_clock::now();
 
-  key_value_stdmap_["state"] = "Aligning";
-  res->pose_with_covariance = alignUsingMonteCarlo(ndt_ptr_, mapTF_initial_pose_msg);
-  key_value_stdmap_["state"] = "Sleeping";
-  res->success = true;
-  res->seq = req->seq;
-  res->pose_with_covariance.pose.covariance = req->pose_with_covariance.pose.covariance;
+  if (ndt_implement_type_ == NDTImplementType::OMP_MULTI_VOXEL) {
+    using T = NormalDistributionsTransformOMPMultiVoxel<PointSource, PointTarget>;
+    std::shared_ptr<T> backup_ndt_omp_ptr = std::dynamic_pointer_cast<T>(backup_ndt_ptr_);
+
+    // Add pcd
+    for (const auto & map_to_add: maps_to_add) {
+      pcl::shared_ptr<pcl::PointCloud<PointTarget>> map_points_ptr(new pcl::PointCloud<PointTarget>);
+      pcl::fromROSMsg(map_to_add.pcd, *map_points_ptr);
+      backup_ndt_omp_ptr->setInputTarget(map_points_ptr, map_to_add.id);
+    }
+
+    // Remove pcd
+    for (const std::string map_id_to_remove: map_ids_to_remove) {
+      backup_ndt_omp_ptr->removeTarget(map_id_to_remove);
+    }
+
+    backup_ndt_omp_ptr->createVoxelKdtree();
+  }
+
+  const auto KOJI_exe_end_time = std::chrono::system_clock::now();
+  const double KOJI_exe_time =
+    std::chrono::duration_cast<std::chrono::microseconds>(KOJI_exe_end_time - KOJI_exe_start_time)
+      .count() /
+    1000.0;
+  RCLCPP_INFO_STREAM(
+    get_logger(),
+    "KOJI until align in callbackMapPoints @ndt_scan_matcher: " << KOJI_exe_time << " [ms]");
+
+  // swap
+  ndt_map_mtx_.lock();
+  ndt_ptr_.swap(backup_ndt_ptr_);
+  ndt_map_mtx_.unlock();
+
+  publishPartialPCDMap();
+  copyNDT(ndt_ptr_, backup_ndt_ptr_, ndt_implement_type_);
 }
+
 
 void NDTScanMatcher::callbackInitialPose(
   const geometry_msgs::msg::PoseWithCovarianceStamped::ConstSharedPtr initial_pose_msg_ptr)
@@ -517,89 +572,6 @@ void NDTScanMatcher::callbackRegularizationPose(
   regularization_pose_msg_ptr_array_.push_back(pose_conv_msg_ptr);
 }
 
-// void NDTScanMatcher::callbackMapPoints(
-//   sensor_msgs::msg::PointCloud2::ConstSharedPtr map_points_msg_ptr)
-// void NDTScanMatcher::callbackMapPoints(
-//   autoware_map_msgs::msg::PCDMapArray::ConstSharedPtr pcd_map_array_msg_ptr)
-void NDTScanMatcher::updateNDT(
-  const std::vector<autoware_map_msgs::msg::PCDMapWithID> & maps_to_add,
-  const std::vector<std::string> & map_ids_to_remove)
-{
-  std::cout << "Received a map! size = " << int(maps_to_add.size()) << std::endl;
-  if ((int(maps_to_add.size()) == 0) & (int(map_ids_to_remove.size()) == 0)) {
-    std::cout << "No map update" << std::endl;
-    return;
-  }
-
-  const auto KOJI_exe_start_time = std::chrono::system_clock::now();
-
-  if (ndt_implement_type_ == NDTImplementType::OMP_MULTI_VOXEL) {
-    using T = NormalDistributionsTransformOMPMultiVoxel<PointSource, PointTarget>;
-    std::shared_ptr<T> backup_ndt_omp_ptr = std::dynamic_pointer_cast<T>(backup_ndt_ptr_);
-
-    // Add pcd
-    for (const auto & map_to_add: maps_to_add) {
-      pcl::shared_ptr<pcl::PointCloud<PointTarget>> map_points_ptr(new pcl::PointCloud<PointTarget>);
-      pcl::fromROSMsg(map_to_add.pcd, *map_points_ptr);
-      backup_ndt_omp_ptr->setInputTarget(map_points_ptr, map_to_add.id);
-    }
-
-    // Remove pcd
-    for (const std::string map_id_to_remove: map_ids_to_remove) {
-      backup_ndt_omp_ptr->removeTarget(map_id_to_remove);
-    }
-
-    backup_ndt_omp_ptr->createVoxelKdtree();
-  }
-
-  double new_min_x = std::numeric_limits<double>::max();
-  double new_min_y = std::numeric_limits<double>::max();
-  double new_max_x = std::numeric_limits<double>::min();
-  double new_max_y = std::numeric_limits<double>::min();
-  for (const auto & map_to_add: maps_to_add) {
-    sensor_msgs::PointCloud2ConstIterator<float> iter_x(map_to_add.pcd, "x");
-    sensor_msgs::PointCloud2ConstIterator<float> iter_y(map_to_add.pcd, "y");
-    while (iter_x != iter_x.end()) {
-      if (new_min_x > *iter_x) {
-        new_min_x = *iter_x;
-      }
-      if (new_min_y > *iter_y) {
-        new_min_y = *iter_y;
-      }
-      if (new_max_x < *iter_x) {
-        new_max_x = *iter_x;
-      }
-      if (new_max_y < *iter_y) {
-        new_max_y = *iter_y;
-      }
-      ++iter_x;
-      ++iter_y;
-    }
-  }
-
-  const auto KOJI_exe_end_time = std::chrono::system_clock::now();
-  const double KOJI_exe_time =
-    std::chrono::duration_cast<std::chrono::microseconds>(KOJI_exe_end_time - KOJI_exe_start_time)
-      .count() /
-    1000.0;
-  RCLCPP_INFO_STREAM(
-    get_logger(),
-    "KOJI until align in callbackMapPoints @ndt_scan_matcher: " << KOJI_exe_time << " [ms]");
-
-  // swap
-  ndt_map_mtx_.lock();
-  ndt_ptr_.swap(backup_ndt_ptr_);
-  min_x_ = new_min_x;
-  min_y_ = new_min_y;
-  max_x_ = new_max_x;
-  max_y_ = new_max_y;
-  
-  ndt_map_mtx_.unlock();
-
-  publishPartialPCDMap();
-  copyNDT(ndt_ptr_, backup_ndt_ptr_, ndt_implement_type_);
-}
-
 void NDTScanMatcher::publishPartialPCDMap()
 {
   pcl::PointCloud<PointTarget> map_pcl;
@@ -610,7 +582,7 @@ void NDTScanMatcher::publishPartialPCDMap()
   sensor_msgs::msg::PointCloud2 map_msg;
   pcl::toROSMsg(map_pcl, map_msg);
   map_msg.header.frame_id = "map";
-  
+
   koji_map_pub_->publish(map_msg);
   std::cout << "published a map!! size = " << map_msg.width << std::endl;
 }
@@ -1009,14 +981,14 @@ bool NDTScanMatcher::validatePositionDifference(
   return true;
 }
 
-bool NDTScanMatcher::hasCompatibleMap(
-  const geometry_msgs::msg::Point & initial_point)
-{
-  bool is_x_axis_ok = (initial_point.x > min_x_) && (initial_point.x < max_x_);
-  bool is_y_axis_ok = (initial_point.y > min_y_) && (initial_point.y < max_y_);
+// bool NDTScanMatcher::hasCompatibleMap(
+//   const geometry_msgs::msg::Point & initial_point)
+// {
+//   bool is_x_axis_ok = (initial_point.x > min_x_) && (initial_point.x < max_x_);
+//   bool is_y_axis_ok = (initial_point.y > min_y_) && (initial_point.y < max_y_);
 
-  return is_x_axis_ok || is_y_axis_ok;
-}
+//   return is_x_axis_ok || is_y_axis_ok;
+// }
 
 std::optional<Eigen::Matrix4f> NDTScanMatcher::interpolateRegularizationPose(
   const rclcpp::Time & sensor_ros_time)

@@ -118,14 +118,14 @@ def launch_setup(context, *args, **kwargs):
     return [group]
 
 
-def get_map_provider():
-    map_provider_launch_file = os.path.join(
-        get_package_share_directory("map_provider"), "launch", "map_provider.launch.xml"
-    )
-    map_provider_launcher = IncludeLaunchDescription(
-        AnyLaunchDescriptionSource(map_provider_launch_file)
-    )
-    return map_provider_launcher
+# def get_map_provider():
+#     map_provider_launch_file = os.path.join(
+#         get_package_share_directory("map_provider"), "launch", "map_provider.launch.xml"
+#     )
+#     map_provider_launcher = IncludeLaunchDescription(
+#         AnyLaunchDescriptionSource(map_provider_launch_file)
+#     )
+#     return map_provider_launcher
 
 
 def generate_launch_description():
@@ -176,6 +176,6 @@ def generate_launch_description():
             set_container_executable,
             set_container_mt_executable,
         ]
-        + [get_map_provider()]
+        # + [get_map_provider()]
         + [OpaqueFunction(function=launch_setup)]
     )

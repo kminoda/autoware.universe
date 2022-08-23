@@ -38,7 +38,7 @@ MapProvider::MapProvider() : Node("map_provider"), tf2_listener_(tf2_buffer_)
     "output/pointcloud_map", rclcpp::QoS(1).transient_local());
 
   pcd_loader_service_group_ = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
-  pcd_loader_client_ = this->create_client<autoware_map_msgs::srv::LoadPCDPartially>(
+  pcd_loader_client_ = this->create_client<autoware_map_msgs::srv::LoadPCDPartiallyForPublish>(
     "pcd_loader_service", rmw_qos_profile_services_default, pcd_loader_service_group_);
   while (!pcd_loader_client_->wait_for_service(std::chrono::seconds(1)) && rclcpp::ok()) {
     RCLCPP_DEBUG(get_logger(), "Waiting for pcd_loader_service...");
@@ -83,14 +83,14 @@ void MapProvider::timerCallback()
   }
 
   // update map
-  auto request = std::make_shared<autoware_map_msgs::srv::LoadPCDPartially::Request>();
+  auto request = std::make_shared<autoware_map_msgs::srv::LoadPCDPartiallyForPublish::Request>();
   request->position.x = transform_stamped.transform.translation.x;
   request->position.y = transform_stamped.transform.translation.y;
   request->position.z = transform_stamped.transform.translation.z;
   request->radius = pointcloud_map_radius_;
   auto result{pcd_loader_client_->async_send_request(
     request,
-    [this](const rclcpp::Client<autoware_map_msgs::srv::LoadPCDPartially>::SharedFuture response) {
+    [this](const rclcpp::Client<autoware_map_msgs::srv::LoadPCDPartiallyForPublish>::SharedFuture response) {
       (void)response;
       std::lock_guard<std::mutex> lock{mutex_};
       value_ready_ = true;
@@ -103,12 +103,12 @@ void MapProvider::timerCallback()
 
   pcd_loader_res_ = result.get();
 
-  if ((int(pcd_loader_res_->maps.pcd_maps.size()) == 0) & (int(pcd_loader_res_->maps.removing_cloud_ids.size()) == 0)) {
-    // RCLCPP_ERROR(
-    //   get_logger(), "No Map Update! pos=%lf, %lf %lf", request->position.x, request->position.y,
-    //   request->position.z);
-    return;
-  }
+  // if ((int(pcd_loader_res_->maps.pcd_maps.size()) == 0) & (int(pcd_loader_res_->maps.removing_cloud_ids.size()) == 0)) {
+  //   // RCLCPP_ERROR(
+  //   //   get_logger(), "No Map Update! pos=%lf, %lf %lf", request->position.x, request->position.y,
+  //   //   request->position.z);
+  //   return;
+  // }
 
-  maps_pub_->publish(pcd_loader_res_->maps);
+  // maps_pub_->publish(pcd_loader_res_->maps);
 }
