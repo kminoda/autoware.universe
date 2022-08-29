@@ -258,7 +258,7 @@ NDTScanMatcher::NDTScanMatcher()
   ekf_odom_sub_ =
     this->create_subscription<nav_msgs::msg::Odometry>(
       "ekf_odom", 100,
-      std::bind(&NDTScanMatcher::callbackEKFOdom, this, std::placeholders::_1));
+      std::bind(&NDTScanMatcher::callbackEKFOdom, this, std::placeholders::_1), map_sub_opt);
 
   sensor_aligned_pose_pub_ =
     this->create_publisher<sensor_msgs::msg::PointCloud2>("points_aligned", 10);
@@ -299,7 +299,8 @@ NDTScanMatcher::NDTScanMatcher()
   service_ = this->create_service<tier4_localization_msgs::srv::PoseWithCovarianceStamped>(
     "ndt_align_srv",
     std::bind(&NDTScanMatcher::serviceNDTAlign, this, std::placeholders::_1, std::placeholders::_2),
-    rclcpp::ServicesQoS().get_rmw_qos_profile(), main_callback_group);
+    rclcpp::ServicesQoS().get_rmw_qos_profile(), map_callback_group);
+    // rclcpp::ServicesQoS().get_rmw_qos_profile());
 
   pcd_loader_client_ = this->create_client<autoware_map_msgs::srv::LoadPCDMapsGeneral>(
     "pcd_loader_service", rmw_qos_profile_services_default);
@@ -307,15 +308,15 @@ NDTScanMatcher::NDTScanMatcher()
     RCLCPP_INFO(get_logger(), "Waiting for pcd loader service...");
   }
   last_update_position_ptr_ = nullptr;
-  update_threshold_distance_ = 10; // TODO koji minoda kokoyabai
+  update_threshold_distance_ = 10.0; // TODO koji minoda kokoyabai
   loading_radius_ = 100; // TODO koji minoda kokoyabai
-  ekf_latest_position_ptr_ = nullptr;
+  current_position_ptr_ = nullptr;
 
   double map_update_dt = 1.0;
   auto period_ns =
     std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::duration<double>(map_update_dt));
   map_update_timer_ = rclcpp::create_timer(
-    this, get_clock(), period_ns, std::bind(&NDTScanMatcher::mapUpdateTimerCallback, this), main_callback_group);
+    this, get_clock(), period_ns, std::bind(&NDTScanMatcher::mapUpdateTimerCallback, this), map_callback_group);
 
   diagnostic_thread_ = std::thread(&NDTScanMatcher::timerDiagnostic, this);
   diagnostic_thread_.detach();
@@ -376,6 +377,10 @@ void NDTScanMatcher::serviceNDTAlign(
   const tier4_localization_msgs::srv::PoseWithCovarianceStamped::Request::SharedPtr req,
   tier4_localization_msgs::srv::PoseWithCovarianceStamped::Response::SharedPtr res)
 {
+  std::cout << "=============== KOJI serviceNDTAlign called ===============" << std::endl;
+  // (void)req; (void)res;
+  ndt_service_align_in_progress_ = true;
+
   // get TF from pose_frame to map_frame
   auto TF_pose_to_map_ptr = std::make_shared<geometry_msgs::msg::TransformStamped>();
   getTransform(map_frame_, req->pose_with_covariance.header.frame_id, TF_pose_to_map_ptr);
@@ -390,6 +395,7 @@ void NDTScanMatcher::serviceNDTAlign(
     RCLCPP_WARN(get_logger(), "No InputSource");
     return;
   }
+  std::cout << "[KOJI serviceNDTAlign] finished updateMap, starting alignUsingMonteCarlo" << std::endl;;
 
   // mutex Map
   std::lock_guard<std::mutex> lock(ndt_map_mtx_);
@@ -402,24 +408,37 @@ void NDTScanMatcher::serviceNDTAlign(
   res->pose_with_covariance.pose.covariance = req->pose_with_covariance.pose.covariance;
 
   last_update_position_ptr_ = std::make_shared<geometry_msgs::msg::Point>(res->pose_with_covariance.pose.pose.position);
+  ndt_service_align_in_progress_ = false;
+
+  std::cout << "=============== KOJI serviceNDTAlign Finished!!!! ===============" << std::endl;;
 }
 
 void NDTScanMatcher::callbackEKFOdom(nav_msgs::msg::Odometry::ConstSharedPtr odom_ptr)
 {
-  ekf_latest_position_ptr_ = std::make_shared<geometry_msgs::msg::Point>(odom_ptr->pose.pose.position);
+  // (void)odom_ptr;
+  current_position_ptr_ = std::make_shared<geometry_msgs::msg::Point>(odom_ptr->pose.pose.position);
+  // std::cout << "KOJI EKF.x = " << current_position_ptr_->x << std::endl;
 }
 
 void NDTScanMatcher::mapUpdateTimerCallback()
 {
-  if (ekf_latest_position_ptr_ == nullptr) return;
+  std::cout << "....................... KOJI timerCallback start!!!!!!!!! ..................." << std::endl;;
 
-  // // continue only if we should update the map
-  // if (shouldUpdateMap(current_position) & (last_update_position_ptr_ != nullptr))
-  // {
-  //   std::cout << "KOJI timerCallback (current_position.x, last pos.x) = (" << current_position.x << ", " << last_update_position_ptr_->x << ")" << std::endl;
-  //   updateMap(current_position);
-  //   last_update_position_ptr_ = std::make_shared<geometry_msgs::msg::Point>(current_position);
-  // }
+  if (current_position_ptr_ == nullptr) return;
+  if (last_update_position_ptr_ == nullptr) return;
+  if (ndt_service_align_in_progress_) return;
+
+  std::cout << "....................... KOJI timerCallback running ..................." << std::endl;;
+
+  // continue only if we should update the map
+  if (shouldUpdateMap(*current_position_ptr_))
+  {
+    std::cout << "=============== KOJI timerCallback called ===============" << std::endl;;
+    std::cout << "KOJI timerCallback (current_position.x, last pos.x) = (" << current_position_ptr_->x << ", " << last_update_position_ptr_->x << ")" << std::endl;
+    updateMap(*current_position_ptr_);
+    *last_update_position_ptr_ = *current_position_ptr_;
+    std::cout << "=============== KOJI timerCallback Finished!!!! ===============" << std::endl;;
+  }
 }
 
 bool NDTScanMatcher::shouldUpdateMap(const geometry_msgs::msg::Point & position)
@@ -731,19 +750,19 @@ void NDTScanMatcher::callbackSensorPoints(
   if (converged_param_type_ == ConvergedParamType::TRANSFORM_PROBABILITY) {
     is_ok_converged_param = transform_probability > converged_param_transform_probability_;
     if (!is_ok_converged_param) {
-      RCLCPP_WARN(
-        get_logger(), "Transform Probability is below the threshold. Score: %lf, Threshold: %lf",
-        transform_probability, converged_param_transform_probability_);
+      // RCLCPP_WARN( // KOJI
+      //   get_logger(), "Transform Probability is below the threshold. Score: %lf, Threshold: %lf",
+      //   transform_probability, converged_param_transform_probability_);
     }
   } else if (converged_param_type_ == ConvergedParamType::NEAREST_VOXEL_TRANSFORMATION_LIKELIHOOD) {
     is_ok_converged_param = nearest_voxel_transformation_likelihood >
                             converged_param_nearest_voxel_transformation_likelihood_;
     if (!is_ok_converged_param) {
-      RCLCPP_WARN(
-        get_logger(),
-        "Nearest Voxel Transform Probability is below the threshold. Score: %lf, Threshold: %lf",
-        nearest_voxel_transformation_likelihood,
-        converged_param_nearest_voxel_transformation_likelihood_);
+      // RCLCPP_WARN( // KOJI
+      //   get_logger(),
+      //   "Nearest Voxel Transform Probability is below the threshold. Score: %lf, Threshold: %lf",
+      //   nearest_voxel_transformation_likelihood,
+      //   converged_param_nearest_voxel_transformation_likelihood_);
     }
   } else {
     is_ok_converged_param = false;
@@ -777,6 +796,8 @@ void NDTScanMatcher::callbackSensorPoints(
   if (is_converged) {
     ndt_pose_pub_->publish(result_pose_stamped_msg);
     ndt_pose_with_covariance_pub_->publish(result_pose_with_cov_msg);
+    // current_position_ptr_ = std::make_shared<geometry_msgs::msg::Point>(result_pose_with_cov_msg.pose.pose.position); // KOJI
+    // std::cout << "KOJI current.x = " << current_position_ptr_->x << std::endl;
   }
 
   publishTF(ndt_base_frame_, result_pose_stamped_msg);
@@ -908,6 +929,8 @@ geometry_msgs::msg::PoseWithCovarianceStamped NDTScanMatcher::alignUsingMonteCar
   result_pose_with_cov_msg.header.frame_id = map_frame_;
   result_pose_with_cov_msg.pose.pose = best_particle_ptr->result_pose;
   // ndt_pose_with_covariance_pub_->publish(result_pose_with_cov_msg);
+  // current_position_ptr_ = std::make_shared<geometry_msgs::msg::Point>(result_pose_with_cov_msg.pose.pose.position); // KOJI
+  // std::cout << "KOJI current.x = " << current_position_ptr_->x << std::endl;
 
   return result_pose_with_cov_msg;
 }

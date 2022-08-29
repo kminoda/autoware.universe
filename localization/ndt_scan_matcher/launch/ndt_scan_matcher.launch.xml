@@ -23,6 +23,7 @@
     <remap from="regularization_pose_with_covariance" to="$(var input_regularization_pose_topic)"/>
 
     <remap from="pcd_loader_service" to="/map/load_pcd_maps_general"/>
+    <remap from="ekf_odom" to="/localization/kinematic_state"/>
 
     <param from="$(var param_file)"/>
   </node>

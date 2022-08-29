@@ -290,9 +290,9 @@ private:
   geometry_msgs::msg::Point::SharedPtr last_update_position_ptr_;
   double update_threshold_distance_;
   double loading_radius_;
-  geometry_msgs::msg::Point::SharedPtr ekf_latest_position_ptr_;
+  geometry_msgs::msg::Point::SharedPtr current_position_ptr_;
 
-  bool map_update_in_progress_{false};
+  bool ndt_service_align_in_progress_{false};
   
   
 };
