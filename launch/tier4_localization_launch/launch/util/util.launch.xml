@@ -12,8 +12,12 @@
 
   <!-- pose_initializer -->
   <group>
-    <include file="$(find-pkg-share pose_initializer)/launch/pose_initializer.launch.xml"/>
     <include file="$(find-pkg-share automatic_pose_initializer)/launch/automatic_pose_initializer.launch.xml"/>
+    <include file="$(find-pkg-share pose_initializer)/launch/pose_initializer.launch.xml">
+      <arg name="gnss_enabled" value="true"/>
+      <arg name="ndt_enabled" value="true"/>
+      <arg name="stop_check_enabled" value="true"/>
+    </include>
   </group>
   <!-- util -->
   <group>
