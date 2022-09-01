@@ -96,6 +96,15 @@ EKFLocalizer::EKFLocalizer(const std::string & node_name, const rclcpp::NodeOpti
   sub_twist_with_cov_ = create_subscription<geometry_msgs::msg::TwistWithCovarianceStamped>(
     "in_twist_with_covariance", 1, std::bind(&EKFLocalizer::callbackTwistWithCovariance, this, _1));
 
+  service_shutdown_node_ = this->create_service<tier4_localization_msgs::srv::ShutdownNode>(
+    "ekf_shutdown_node_srv",
+    std::bind(&EKFLocalizer::serviceShutdownNode, this, std::placeholders::_1, std::placeholders::_2),
+    rclcpp::ServicesQoS().get_rmw_qos_profile());
+  service_start_node_ = this->create_service<tier4_localization_msgs::srv::StartNode>(
+    "ekf_start_node_srv",
+    std::bind(&EKFLocalizer::serviceStartNode, this, std::placeholders::_1, std::placeholders::_2),
+    rclcpp::ServicesQoS().get_rmw_qos_profile());
+
   dim_x_ex_ = dim_x_ * extend_state_step_;
 
   tf_br_ = std::make_shared<tf2_ros::TransformBroadcaster>(
@@ -336,7 +345,7 @@ void EKFLocalizer::callbackInitialPose(
 
   while (!current_pose_info_queue_.empty()) current_pose_info_queue_.pop();
 
-  is_initialized_ = true;
+  // is_initialized_ = true;
 }
 
 /*
@@ -345,6 +354,7 @@ void EKFLocalizer::callbackInitialPose(
 void EKFLocalizer::callbackPoseWithCovariance(
   geometry_msgs::msg::PoseWithCovarianceStamped::SharedPtr msg)
 {
+  if (!is_initialized_) return;
   PoseInfo pose_info = {msg, 0, pose_smoothing_steps_};
   current_pose_info_queue_.push(pose_info);
 
@@ -357,6 +367,7 @@ void EKFLocalizer::callbackPoseWithCovariance(
 void EKFLocalizer::callbackTwistWithCovariance(
   geometry_msgs::msg::TwistWithCovarianceStamped::SharedPtr msg)
 {
+  if (!is_initialized_) return;
   TwistInfo twist_info = {msg, 0, twist_smoothing_steps_};
   current_twist_info_queue_.push(twist_info);
 }
@@ -781,4 +792,30 @@ void EKFLocalizer::updateSimple1DFilters(const geometry_msgs::msg::PoseWithCovar
   z_filter_.update(z, z_dev, pose.header.stamp);
   roll_filter_.update(roll, roll_dev, pose.header.stamp);
   pitch_filter_.update(pitch, pitch_dev, pose.header.stamp);
+}
+
+/**
+ * @brief shutdown node
+ */
+void EKFLocalizer::serviceShutdownNode(
+  const tier4_localization_msgs::srv::ShutdownNode::Request::SharedPtr req,
+  tier4_localization_msgs::srv::ShutdownNode::Response::SharedPtr res)
+{
+  (void)req;
+  is_initialized_ = false;
+  res->success = true;
+}
+
+/**
+ * @brief start node
+ */
+void EKFLocalizer::serviceStartNode(
+  const tier4_localization_msgs::srv::StartNode::Request::SharedPtr req,
+  tier4_localization_msgs::srv::StartNode::Response::SharedPtr res)
+{
+  (void)req;
+  while (!current_pose_info_queue_.empty()) current_pose_info_queue_.pop();
+  while (!current_twist_info_queue_.empty()) current_twist_info_queue_.pop();
+  is_initialized_ = true;
+  res->success = true;
 }

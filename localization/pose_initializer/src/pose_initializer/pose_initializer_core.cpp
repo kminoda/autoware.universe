@@ -18,6 +18,7 @@
 #include "gnss_module.hpp"
 #include "ndt_module.hpp"
 #include "stop_check_module.hpp"
+#include "localization_managing_module.hpp"
 
 #include <memory>
 #include <vector>
@@ -28,7 +29,7 @@ PoseInitializer::PoseInitializer() : Node("pose_initializer")
   group_srv_ = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
   node.init_pub(pub_state_);
   node.init_srv(srv_initialize_, this, &PoseInitializer::on_initialize, group_srv_);
-  pub_reset_ = create_publisher<PoseWithCovarianceStamped>("pose_reset", 1);
+  pub_pose_reset_ = create_publisher<PoseWithCovarianceStamped>("pose_reset", 1);
 
   output_pose_covariance_ = get_covariance_parameter(this, "output_pose_covariance");
   gnss_particle_covariance_ = get_covariance_parameter(this, "gnss_particle_covariance");
@@ -44,6 +45,7 @@ PoseInitializer::PoseInitializer() : Node("pose_initializer")
     stop_check_duration_ = declare_parameter<double>("stop_check_duration");
     stop_check_ = std::make_unique<StopCheckModule>(this, stop_check_duration_ + 1.0);
   }
+  localization_manager_ = std::make_unique<LocalizationManagingModule>(this);
   change_state(State::Message::UNINITIALIZED);
 }
 
@@ -70,16 +72,21 @@ void PoseInitializer::on_initialize(
   }
   try {
     change_state(State::Message::INITIALIZING);
+
+    localization_manager_->shutdown();
     auto pose = req->pose.empty() ? get_gnss_pose() : req->pose.front();
     if (ndt_) {
       pose = ndt_->align_pose(pose);
     }
     pose.pose.covariance = output_pose_covariance_;
-    pub_reset_->publish(pose);
+    pub_pose_reset_->publish(pose);
+    localization_manager_->start();
     res->status.success = true;
+    std::cout << "HOGEHOGE!!!!!!!!!!!!!!" << std::endl;
     change_state(State::Message::INITIALIZED);
   } catch (const ServiceException & error) {
     res->status = error.status();
+    std::cout << "HOGEHOGE..................." << std::endl;
     change_state(State::Message::UNINITIALIZED);
   }
 }

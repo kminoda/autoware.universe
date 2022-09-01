@@ -32,6 +32,8 @@
 #include <tier4_debug_msgs/msg/float32_stamped.hpp>
 #include <tier4_debug_msgs/msg/int32_stamped.hpp>
 #include <tier4_localization_msgs/srv/pose_with_covariance_stamped.hpp>
+#include <tier4_localization_msgs/srv/shutdown_node.hpp>
+#include <tier4_localization_msgs/srv/start_node.hpp>
 #include <visualization_msgs/msg/marker_array.hpp>
 
 #include <fmt/format.h>
@@ -142,6 +144,13 @@ private:
 
   void timerDiagnostic();
 
+  void serviceShutdownNode(
+    const tier4_localization_msgs::srv::ShutdownNode::Request::SharedPtr req,
+    tier4_localization_msgs::srv::ShutdownNode::Response::SharedPtr res);
+  void serviceStartNode(
+    const tier4_localization_msgs::srv::StartNode::Request::SharedPtr req,
+    tier4_localization_msgs::srv::StartNode::Response::SharedPtr res);
+
   rclcpp::Subscription<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr initial_pose_sub_;
   rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr map_points_sub_;
   rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr sensor_points_sub_;
@@ -171,6 +180,10 @@ private:
   rclcpp::Publisher<diagnostic_msgs::msg::DiagnosticArray>::SharedPtr diagnostics_pub_;
 
   rclcpp::Service<tier4_localization_msgs::srv::PoseWithCovarianceStamped>::SharedPtr service_;
+  //!< @brief shutdown service
+  rclcpp::Service<tier4_localization_msgs::srv::ShutdownNode>::SharedPtr service_shutdown_node_;
+  //!< @brief start service
+  rclcpp::Service<tier4_localization_msgs::srv::StartNode>::SharedPtr service_start_node_;
 
   tf2_ros::Buffer tf2_buffer_;
   tf2_ros::TransformListener tf2_listener_;
@@ -210,6 +223,8 @@ private:
   const float regularization_scale_factor_;
   std::deque<geometry_msgs::msg::PoseWithCovarianceStamped::ConstSharedPtr>
     regularization_pose_msg_ptr_array_;
+
+  bool is_shutdown_;
 };
 
 #endif  // NDT_SCAN_MATCHER__NDT_SCAN_MATCHER_CORE_HPP_

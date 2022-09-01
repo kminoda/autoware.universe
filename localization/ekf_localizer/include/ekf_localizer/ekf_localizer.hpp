@@ -30,6 +30,8 @@
 #include <nav_msgs/msg/odometry.hpp>
 #include <tier4_debug_msgs/msg/float64_multi_array_stamped.hpp>
 #include <tier4_debug_msgs/msg/float64_stamped.hpp>
+#include <tier4_localization_msgs/srv/shutdown_node.hpp>
+#include <tier4_localization_msgs/srv/start_node.hpp>
 
 #include <tf2/LinearMath/Quaternion.h>
 #include <tf2/utils.h>
@@ -145,6 +147,10 @@ private:
   rclcpp::TimerBase::SharedPtr timer_control_;
   //!< @brief last predict time
   std::shared_ptr<const rclcpp::Time> last_predict_time_;
+  //!< @brief shutdown service
+  rclcpp::Service<tier4_localization_msgs::srv::ShutdownNode>::SharedPtr service_shutdown_node_;
+  //!< @brief start service
+  rclcpp::Service<tier4_localization_msgs::srv::StartNode>::SharedPtr service_start_node_;
 
   //!< @brief timer to send transform
   rclcpp::TimerBase::SharedPtr timer_tf_;
@@ -313,7 +319,24 @@ private:
    */
   void showCurrentX();
 
+  /**
+   * @brief update Simple1DFilters
+   */
   void updateSimple1DFilters(const geometry_msgs::msg::PoseWithCovarianceStamped & pose);
+
+  /**
+   * @brief shutdown node
+   */
+  void serviceShutdownNode(
+    const tier4_localization_msgs::srv::ShutdownNode::Request::SharedPtr req,
+    tier4_localization_msgs::srv::ShutdownNode::Response::SharedPtr res);
+
+  /**
+   * @brief shutdown node
+   */
+  void serviceStartNode(
+    const tier4_localization_msgs::srv::StartNode::Request::SharedPtr req,
+    tier4_localization_msgs::srv::StartNode::Response::SharedPtr res);
 
   tier4_autoware_utils::StopWatch<std::chrono::milliseconds> stop_watch_;
 

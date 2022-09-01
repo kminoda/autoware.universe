@@ -11,7 +11,7 @@
   </node>
 
   <!-- pose initializer -->
-  <node pkg="pose_initializer" exec="pose_initializer_node" name="pose_initializer_node">
+  <node pkg="pose_initializer" exec="pose_initializer_node" name="pose_initializer_node" output="screen">
     <param from="$(var config_file)"/>
     <param name="ndt_enabled" value="$(var ndt_enabled)"/>
     <remap from="ndt_align" to="/localization/pose_estimator/ndt_align_srv"/>
@@ -22,5 +22,9 @@
     <param name="gnss_pose_timeout" value="3.0"/>
     <remap from="gnss_pose_cov" to="/sensing/gnss/pose_with_covariance"/>
     <remap from="pose_reset" to="/initialpose3d"/>
+    <remap from="ndt_shutdown_node" to="/localization/pose_estimator/shutdown_node"/>
+    <remap from="ndt_start_node" to="/localization/pose_estimator/start_node"/>
+    <remap from="ekf_shutdown_node" to="/localization/pose_twist_fusion_filter/shutdown_node"/>
+    <remap from="ekf_start_node" to="/localization/pose_twist_fusion_filter/start_node"/>
   </node>
 </launch>

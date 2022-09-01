@@ -24,9 +24,15 @@ AutomaticPoseInitializer::AutomaticPoseInitializer() : Node("automatic_pose_init
   const auto adaptor = component_interface_utils::NodeAdaptor(this);
   group_cli_ = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
   adaptor.init_cli(cli_initialize_, group_cli_);
-  adaptor.init_sub(sub_state_, [this](const State::Message::ConstSharedPtr msg) { state_ = *msg; });
+  adaptor.init_sub(sub_state_, [this](const State::Message::ConstSharedPtr msg) { 
+    state_ = *msg; 
+    if (state_.state == State::Message::UNINITIALIZED) {std::cout << "KOJI UNINITIALIZED" << std::endl;}
+    if (state_.state == State::Message::INITIALIZING) {std::cout << "KOJI INITIALIZING" << std::endl;}
+    if (state_.state == State::Message::INITIALIZED) {std::cout << "KOJI INITIALIZED" << std::endl;}
 
-  const auto period = rclcpp::Rate(1.0).period();
+  });
+
+  const auto period = rclcpp::Rate(0.3).period();
   timer_ = rclcpp::create_timer(this, get_clock(), period, [this]() { on_timer(); });
 
   state_.stamp = now();
@@ -36,6 +42,8 @@ AutomaticPoseInitializer::AutomaticPoseInitializer() : Node("automatic_pose_init
 void AutomaticPoseInitializer::on_timer()
 {
   if (state_.state == State::Message::UNINITIALIZED) {
+    std::cout << "AUTOMATIC_POSE_INITIALIZER KOJI : state: UNINITIALIZED" << std::endl;
+
     try {
       const auto req = std::make_shared<Initialize::Service::Request>();
       cli_initialize_->call(req);

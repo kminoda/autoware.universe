@@ -26,6 +26,7 @@
 class StopCheckModule;
 class NdtModule;
 class GnssModule;
+class LocalizationManagingModule;
 
 class PoseInitializer : public rclcpp::Node
 {
@@ -40,7 +41,7 @@ private:
   using PoseWithCovarianceStamped = geometry_msgs::msg::PoseWithCovarianceStamped;
 
   rclcpp::CallbackGroup::SharedPtr group_srv_;
-  rclcpp::Publisher<PoseWithCovarianceStamped>::SharedPtr pub_reset_;
+  rclcpp::Publisher<PoseWithCovarianceStamped>::SharedPtr pub_pose_reset_;
   component_interface_utils::Publisher<State>::SharedPtr pub_state_;
   component_interface_utils::Service<Initialize>::SharedPtr srv_initialize_;
   State::Message state_;
@@ -49,6 +50,7 @@ private:
   std::unique_ptr<GnssModule> gnss_;
   std::unique_ptr<NdtModule> ndt_;
   std::unique_ptr<StopCheckModule> stop_check_;
+  std::unique_ptr<LocalizationManagingModule> localization_manager_;
   double stop_check_duration_;
   void change_state(State::Message::_state_type state);
   void on_initialize(

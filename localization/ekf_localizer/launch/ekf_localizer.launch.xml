@@ -6,6 +6,8 @@
   <arg name="extend_state_step" default="50"/>
 
   <arg name="input_initial_pose_name" default="initialpose3d"/>
+  <arg name="input_service_shutdown_node" default="shutdown_node" description="Shutdown service name"/>
+  <arg name="input_service_start_node" default="start_node" description="Start service name"/>
 
   <!-- for Pose measurement -->
   <arg name="input_pose_with_cov_name" default="in_pose_with_covariance"/>
@@ -40,6 +42,9 @@
     <remap from="in_twist_with_covariance" to="$(var input_twist_with_cov_name)"/>
 
     <remap from="initialpose" to="$(var input_initial_pose_name)"/>
+
+    <remap from="ekf_shutdown_node_srv" to="$(var input_service_shutdown_node)"/>
+    <remap from="ekf_start_node_srv" to="$(var input_service_start_node)"/>
 
     <param name="pose_frame_id" value="map"/>
 

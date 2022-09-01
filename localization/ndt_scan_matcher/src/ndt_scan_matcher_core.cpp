@@ -272,6 +272,14 @@ NDTScanMatcher::NDTScanMatcher()
     "ndt_align_srv",
     std::bind(&NDTScanMatcher::serviceNDTAlign, this, std::placeholders::_1, std::placeholders::_2),
     rclcpp::ServicesQoS().get_rmw_qos_profile(), main_callback_group);
+  service_shutdown_node_ = this->create_service<tier4_localization_msgs::srv::ShutdownNode>(
+    "ndt_shutdown_node_srv",
+    std::bind(&NDTScanMatcher::serviceShutdownNode, this, std::placeholders::_1, std::placeholders::_2),
+    rclcpp::ServicesQoS().get_rmw_qos_profile());
+  service_start_node_ = this->create_service<tier4_localization_msgs::srv::StartNode>(
+    "ndt_start_node_srv",
+    std::bind(&NDTScanMatcher::serviceStartNode, this, std::placeholders::_1, std::placeholders::_2),
+    rclcpp::ServicesQoS().get_rmw_qos_profile());
 
   diagnostic_thread_ = std::thread(&NDTScanMatcher::timerDiagnostic, this);
   diagnostic_thread_.detach();
@@ -617,6 +625,8 @@ void NDTScanMatcher::callbackSensorPoints(
   }
 
   // publish
+  if (is_shutdown_) return;
+
   geometry_msgs::msg::PoseStamped result_pose_stamped_msg;
   result_pose_stamped_msg.header.stamp = sensor_ros_time;
   result_pose_stamped_msg.header.frame_id = map_frame_;
@@ -859,4 +869,29 @@ std::optional<Eigen::Matrix4f> NDTScanMatcher::interpolateRegularizationPose(
   Eigen::Affine3d regularization_pose_affine;
   tf2::fromMsg(regularization_pose_msg.pose, regularization_pose_affine);
   return regularization_pose_affine.matrix().cast<float>();
+}
+
+/**
+ * @brief shutdown node
+ */
+void NDTScanMatcher::serviceShutdownNode(
+  const tier4_localization_msgs::srv::ShutdownNode::Request::SharedPtr req,
+  tier4_localization_msgs::srv::ShutdownNode::Response::SharedPtr res)
+{
+  (void)req;
+  is_shutdown_ = true;
+  res->success = true;
+}
+
+/**
+ * @brief start node
+ */
+void NDTScanMatcher::serviceStartNode(
+  const tier4_localization_msgs::srv::StartNode::Request::SharedPtr req,
+  tier4_localization_msgs::srv::StartNode::Response::SharedPtr res)
+{
+  (void)req;
+  initial_pose_msg_ptr_array_.clear();
+  is_shutdown_ = false;
+  res->success = true;
 }
