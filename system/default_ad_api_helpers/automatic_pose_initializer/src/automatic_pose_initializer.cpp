@@ -33,6 +33,7 @@ AutomaticPoseInitializer::AutomaticPoseInitializer() : Node("automatic_pose_init
   });
 
   const auto period = rclcpp::Rate(0.3).period();
+
   timer_ = rclcpp::create_timer(this, get_clock(), period, [this]() { on_timer(); });
 
   state_.stamp = now();
@@ -41,6 +42,7 @@ AutomaticPoseInitializer::AutomaticPoseInitializer() : Node("automatic_pose_init
 
 void AutomaticPoseInitializer::on_timer()
 {
+  timer_->cancel();
   if (state_.state == State::Message::UNINITIALIZED) {
     std::cout << "AUTOMATIC_POSE_INITIALIZER KOJI : state: UNINITIALIZED" << std::endl;
 
@@ -50,6 +52,8 @@ void AutomaticPoseInitializer::on_timer()
     } catch (const component_interface_utils::ServiceException & error) {
     }
   }
+
+  timer_->reset();
 }
 
 }  // namespace automatic_pose_initializer
