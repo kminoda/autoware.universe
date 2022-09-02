@@ -498,8 +498,7 @@ void NDTScanMatcher::callback_sensor_points(
   publish_initial_to_result_distances(
     sensor_ros_time, ndt_result.pose, interpolator.get_current_pose(), interpolator.get_old_pose(),
     interpolator.get_new_pose());
-  if (validation_result.is_converged)
-    publish_pose(sensor_ros_time, ndt_result.pose);
+  if (validation_result.is_converged) publish_pose(sensor_ros_time, ndt_result.pose);
 
   key_value_stdmap_["transform_probability"] = std::to_string(ndt_result.transform_probability);
   key_value_stdmap_["nearest_voxel_transformation_likelihood"] =
