@@ -482,35 +482,7 @@ void NDTScanMatcher::callback_sensor_points(
   key_value_stdmap_["state"] = "Sleeping";
 
   // perform several validations
-  /*****************************************************************************
-  The reason the add 2 to the ndt_ptr_->getMaximumIterations() is that there are bugs in
-  implementation of ndt.
-  1. gradient descent method ends when the iteration is greater than max_iteration if it does not
-  converge (be careful it's 'greater than' instead of 'greater equal than'.)
-     https://github.com/tier4/autoware.iv/blob/2323e5baa0b680d43a9219f5fb3b7a11dd9edc82/localization/pose_estimator/ndt_scan_matcher/ndt_omp/include/ndt_omp/ndt_omp_impl.hpp#L212
-  2. iterate iteration count when end of gradient descent function.
-     https://github.com/tier4/autoware.iv/blob/2323e5baa0b680d43a9219f5fb3b7a11dd9edc82/localization/pose_estimator/ndt_scan_matcher/ndt_omp/include/ndt_omp/ndt_omp_impl.hpp#L217
-
-  These bugs are now resolved in original pcl implementation.
-  https://github.com/PointCloudLibrary/pcl/blob/424c1c6a0ca97d94ca63e5daff4b183a4db8aae4/registration/include/pcl/registration/impl/ndt.hpp#L73-L180
-  *****************************************************************************/
-  bool is_ok_iteration_num =
-    validate_num_iteration(ndt_result.iteration_num, ndt_ptr_->getMaximumIterations() + 2);
-  bool is_local_optimal_solution_oscillation = false;
-  if (!is_ok_iteration_num) {
-    is_local_optimal_solution_oscillation = validate_local_optimal_solution_oscillation(
-      ndt_result.transformation_array, oscillation_threshold_, inversion_vector_threshold_);
-  }
-  bool is_ok_converged_param = validate_converged_param(
-    ndt_result.transform_probability, ndt_result.nearest_voxel_transformation_likelihood);
-  bool is_converged = is_ok_iteration_num && is_ok_converged_param;
-  static size_t skipping_publish_num = 0;
-  if (is_converged) {
-    skipping_publish_num = 0;
-  } else {
-    ++skipping_publish_num;
-    RCLCPP_WARN(get_logger(), "Not Converged");
-  }
+  const NdtValidationResult validation_result = validate_ndt_result(ndt_result);
 
   // publish
   initial_pose_with_covariance_pub_->publish(interpolator.get_current_pose());
@@ -526,15 +498,15 @@ void NDTScanMatcher::callback_sensor_points(
   publish_initial_to_result_distances(
     sensor_ros_time, ndt_result.pose, interpolator.get_current_pose(), interpolator.get_old_pose(),
     interpolator.get_new_pose());
-  if (is_converged)
+  if (validation_result.is_converged)
     publish_pose(sensor_ros_time, ndt_result.pose);
 
   key_value_stdmap_["transform_probability"] = std::to_string(ndt_result.transform_probability);
   key_value_stdmap_["nearest_voxel_transformation_likelihood"] =
     std::to_string(ndt_result.nearest_voxel_transformation_likelihood);
   key_value_stdmap_["iteration_num"] = std::to_string(ndt_result.iteration_num);
-  key_value_stdmap_["skipping_publish_num"] = std::to_string(skipping_publish_num);
-  if (is_local_optimal_solution_oscillation) {
+  key_value_stdmap_["skipping_publish_num"] = std::to_string(validation_result.skipping_publish_num);
+  if (validation_result.is_local_optimal_solution_oscillation) {
     key_value_stdmap_["is_local_optimal_solution_oscillation"] = "1";
   } else {
     key_value_stdmap_["is_local_optimal_solution_oscillation"] = "0";
@@ -756,6 +728,46 @@ bool NDTScanMatcher::get_transform(
     return false;
   }
   return true;
+}
+
+
+NdtValidationResult NDTScanMatcher::validate_ndt_result(const NdtResult & ndt_result)
+{
+  /*****************************************************************************
+  The reason the add 2 to the ndt_ptr_->getMaximumIterations() is that there are bugs in
+  implementation of ndt.
+  1. gradient descent method ends when the iteration is greater than max_iteration if it does not
+  converge (be careful it's 'greater than' instead of 'greater equal than'.)
+     https://github.com/tier4/autoware.iv/blob/2323e5baa0b680d43a9219f5fb3b7a11dd9edc82/localization/pose_estimator/ndt_scan_matcher/ndt_omp/include/ndt_omp/ndt_omp_impl.hpp#L212
+  2. iterate iteration count when end of gradient descent function.
+     https://github.com/tier4/autoware.iv/blob/2323e5baa0b680d43a9219f5fb3b7a11dd9edc82/localization/pose_estimator/ndt_scan_matcher/ndt_omp/include/ndt_omp/ndt_omp_impl.hpp#L217
+
+  These bugs are now resolved in original pcl implementation.
+  https://github.com/PointCloudLibrary/pcl/blob/424c1c6a0ca97d94ca63e5daff4b183a4db8aae4/registration/include/pcl/registration/impl/ndt.hpp#L73-L180
+  *****************************************************************************/
+  bool is_ok_iteration_num =
+    validate_num_iteration(ndt_result.iteration_num, ndt_ptr_->getMaximumIterations() + 2);
+  bool is_local_optimal_solution_oscillation = false;
+  if (!is_ok_iteration_num) {
+    is_local_optimal_solution_oscillation = validate_local_optimal_solution_oscillation(
+      ndt_result.transformation_array, oscillation_threshold_, inversion_vector_threshold_);
+  }
+  bool is_ok_converged_param = validate_converged_param(
+    ndt_result.transform_probability, ndt_result.nearest_voxel_transformation_likelihood);
+  bool is_converged = is_ok_iteration_num && is_ok_converged_param;
+  static size_t skipping_publish_num = 0;
+  if (is_converged) {
+    skipping_publish_num = 0;
+  } else {
+    ++skipping_publish_num;
+    RCLCPP_WARN(get_logger(), "Not Converged");
+  }
+
+  NdtValidationResult validation_result;
+  validation_result.is_converged = is_converged;
+  validation_result.is_local_optimal_solution_oscillation = is_local_optimal_solution_oscillation;
+  validation_result.skipping_publish_num = skipping_publish_num;
+  return validation_result;
 }
 
 bool NDTScanMatcher::validate_num_iteration(const int iter_num, const int max_iter_num)

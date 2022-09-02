@@ -18,6 +18,11 @@
 #define FMT_HEADER_ONLY
 
 #include "ndt_scan_matcher/particle.hpp"
+#include "ndt_scan_matcher/debug.hpp"
+#include "ndt_scan_matcher/matrix_type.hpp"
+#include "ndt_scan_matcher/particle.hpp"
+#include "ndt_scan_matcher/pose_array_interpolator.hpp"
+#include "ndt_scan_matcher/util_func.hpp"
 
 #include <ndt/omp.hpp>
 #include <ndt/pcl_generic.hpp>
@@ -76,6 +81,13 @@ struct NdtResult
   int iteration_num;
   std::vector<Eigen::Matrix4f, Eigen::aligned_allocator<Eigen::Matrix4f>> transformation_array;
   double exe_time;
+};
+
+struct NdtValidationResult
+{
+  bool is_converged;
+  bool is_local_optimal_solution_oscillation;
+  int skipping_publish_num;
 };
 
 template <typename PointSource, typename PointTarget>
@@ -160,6 +172,7 @@ private:
     const std::string & target_frame, const std::string & source_frame,
     const geometry_msgs::msg::TransformStamped::SharedPtr & transform_stamped_ptr);
 
+  NdtValidationResult validate_ndt_result(const NdtResult & ndt_result);
   bool validate_num_iteration(const int iter_num, const int max_iter_num);
   bool validate_score(
     const double score, const double score_threshold, const std::string score_name);
