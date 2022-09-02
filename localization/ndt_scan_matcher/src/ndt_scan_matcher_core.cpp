@@ -504,7 +504,8 @@ void NDTScanMatcher::callback_sensor_points(
   key_value_stdmap_["nearest_voxel_transformation_likelihood"] =
     std::to_string(ndt_result.nearest_voxel_transformation_likelihood);
   key_value_stdmap_["iteration_num"] = std::to_string(ndt_result.iteration_num);
-  key_value_stdmap_["skipping_publish_num"] = std::to_string(validation_result.skipping_publish_num);
+  key_value_stdmap_["skipping_publish_num"] =
+    std::to_string(validation_result.skipping_publish_num);
   if (validation_result.is_local_optimal_solution_oscillation) {
     key_value_stdmap_["is_local_optimal_solution_oscillation"] = "1";
   } else {
@@ -728,7 +729,6 @@ bool NDTScanMatcher::get_transform(
   }
   return true;
 }
-
 
 NdtValidationResult NDTScanMatcher::validate_ndt_result(const NdtResult & ndt_result)
 {

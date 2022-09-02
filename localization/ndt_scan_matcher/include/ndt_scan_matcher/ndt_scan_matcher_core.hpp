@@ -17,7 +17,6 @@
 
 #define FMT_HEADER_ONLY
 
-#include "ndt_scan_matcher/particle.hpp"
 #include "ndt_scan_matcher/debug.hpp"
 #include "ndt_scan_matcher/matrix_type.hpp"
 #include "ndt_scan_matcher/particle.hpp"
