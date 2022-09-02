@@ -75,6 +75,7 @@ struct NdtResult
   float nearest_voxel_transformation_likelihood;
   int iteration_num;
   std::vector<Eigen::Matrix4f, Eigen::aligned_allocator<Eigen::Matrix4f>> transformation_array;
+  double exe_time;
 };
 
 template <typename PointSource, typename PointTarget>
@@ -141,8 +142,7 @@ private:
   void publish_tf(
     const rclcpp::Time & sensor_ros_time, const geometry_msgs::msg::Pose & result_pose_msg);
   void publish_pose(
-    const rclcpp::Time & sensor_ros_time, const geometry_msgs::msg::Pose & result_pose_msg,
-    const bool is_converged);
+    const rclcpp::Time & sensor_ros_time, const geometry_msgs::msg::Pose & result_pose_msg);
   void publish_point_cloud(
     const rclcpp::Time & sensor_ros_time, const geometry_msgs::msg::Pose & result_pose,
     const std::shared_ptr<const pcl::PointCloud<pcl::PointXYZ>> & sensor_points_baselinkTF_ptr);

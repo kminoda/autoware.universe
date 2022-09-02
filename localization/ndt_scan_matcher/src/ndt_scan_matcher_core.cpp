@@ -444,7 +444,6 @@ void NDTScanMatcher::callback_sensor_points(
   // mutex ndt_ptr_
   std::lock_guard<std::mutex> lock(ndt_ptr_mtx_);
 
-  const auto exe_start_time = std::chrono::system_clock::now();
   const rclcpp::Time sensor_ros_time = sensor_points_sensorTF_msg_ptr->header.stamp;
 
   // preprocess input pointcloud
@@ -482,11 +481,6 @@ void NDTScanMatcher::callback_sensor_points(
   const NdtResult ndt_result = align(interpolator.get_current_pose().pose.pose);
   key_value_stdmap_["state"] = "Sleeping";
 
-  const auto exe_end_time = std::chrono::system_clock::now();
-  const double exe_time =
-    std::chrono::duration_cast<std::chrono::microseconds>(exe_end_time - exe_start_time).count() /
-    1000.0;
-
   // perform several validations
   /*****************************************************************************
   The reason the add 2 to the ndt_ptr_->getMaximumIterations() is that there are bugs in
@@ -520,19 +514,20 @@ void NDTScanMatcher::callback_sensor_points(
 
   // publish
   initial_pose_with_covariance_pub_->publish(interpolator.get_current_pose());
-  exe_time_pub_->publish(make_float32_stamped(sensor_ros_time, exe_time));
+  exe_time_pub_->publish(make_float32_stamped(sensor_ros_time, ndt_result.exe_time));
   transform_probability_pub_->publish(
     make_float32_stamped(sensor_ros_time, ndt_result.transform_probability));
   nearest_voxel_transformation_likelihood_pub_->publish(
     make_float32_stamped(sensor_ros_time, ndt_result.nearest_voxel_transformation_likelihood));
   iteration_num_pub_->publish(make_int32_stamped(sensor_ros_time, ndt_result.iteration_num));
   publish_tf(sensor_ros_time, ndt_result.pose);
-  publish_pose(sensor_ros_time, ndt_result.pose, is_converged);
   publish_point_cloud(sensor_ros_time, ndt_result.pose, sensor_points_baselinkTF_ptr);
   publish_marker(sensor_ros_time, ndt_result.transformation_array);
   publish_initial_to_result_distances(
     sensor_ros_time, ndt_result.pose, interpolator.get_current_pose(), interpolator.get_old_pose(),
     interpolator.get_new_pose());
+  if (is_converged)
+    publish_pose(sensor_ros_time, ndt_result.pose);
 
   key_value_stdmap_["transform_probability"] = std::to_string(ndt_result.transform_probability);
   key_value_stdmap_["nearest_voxel_transformation_likelihood"] =
@@ -561,6 +556,8 @@ void NDTScanMatcher::transform_sensor_measurement(
 
 NdtResult NDTScanMatcher::align(const geometry_msgs::msg::Pose & initial_pose_msg)
 {
+  const auto exe_start_time = std::chrono::system_clock::now();
+
   const Eigen::Affine3d initial_pose_affine = from_ros_pose_to_eigen(initial_pose_msg);
   const Eigen::Matrix4f initial_pose_matrix = initial_pose_affine.matrix().cast<float>();
 
@@ -571,6 +568,11 @@ NdtResult NDTScanMatcher::align(const geometry_msgs::msg::Pose & initial_pose_ms
   Eigen::Affine3d result_pose_affine;
   result_pose_affine.matrix() = result_pose_matrix.cast<double>();
 
+  const auto exe_end_time = std::chrono::system_clock::now();
+  const double exe_time =
+    std::chrono::duration_cast<std::chrono::microseconds>(exe_end_time - exe_start_time).count() /
+    1000.0;
+
   NdtResult ndt_result;
   ndt_result.pose = tf2::toMsg(result_pose_affine);
   ndt_result.transformation_array = ndt_ptr_->getFinalTransformationArray();
@@ -578,6 +580,8 @@ NdtResult NDTScanMatcher::align(const geometry_msgs::msg::Pose & initial_pose_ms
   ndt_result.nearest_voxel_transformation_likelihood =
     ndt_ptr_->getNearestVoxelTransformationLikelihood();
   ndt_result.iteration_num = ndt_ptr_->getFinalNumIteration();
+  ndt_result.exe_time = exe_time;
+
   return ndt_result;
 }
 
@@ -637,8 +641,7 @@ void NDTScanMatcher::publish_tf(
 }
 
 void NDTScanMatcher::publish_pose(
-  const rclcpp::Time & sensor_ros_time, const geometry_msgs::msg::Pose & result_pose_msg,
-  const bool is_converged)
+  const rclcpp::Time & sensor_ros_time, const geometry_msgs::msg::Pose & result_pose_msg)
 {
   geometry_msgs::msg::PoseStamped result_pose_stamped_msg;
   result_pose_stamped_msg.header.stamp = sensor_ros_time;
@@ -651,13 +654,8 @@ void NDTScanMatcher::publish_pose(
   result_pose_with_cov_msg.pose.pose = result_pose_msg;
   result_pose_with_cov_msg.pose.covariance = output_pose_covariance_;
 
-  if (is_converged) {
-    ndt_pose_pub_->publish(result_pose_stamped_msg);
-    ndt_pose_with_covariance_pub_->publish(result_pose_with_cov_msg);
-  }
-
-  tf2_broadcaster_.sendTransform(
-    tier4_autoware_utils::pose2transform(result_pose_stamped_msg, ndt_base_frame_));
+  ndt_pose_pub_->publish(result_pose_stamped_msg);
+  ndt_pose_with_covariance_pub_->publish(result_pose_with_cov_msg);
 }
 
 void NDTScanMatcher::publish_point_cloud(
