@@ -89,6 +89,23 @@ struct NdtValidationResult
   int skipping_publish_num;
 };
 
+// TODO(Tier IV): move file
+struct OMPParams
+{
+  pclomp::NeighborSearchMethod search_method;
+  int num_threads;
+  double regularization_scale_factor;
+};
+
+struct NdtParams
+{
+  OMPParams omp_params;
+  double trans_epsilon;
+  double step_size;
+  double resolution;
+  int max_iterations;
+};
+
 template <typename PointSource, typename PointTarget>
 std::shared_ptr<NormalDistributionsTransformBase<PointSource, PointTarget>> get_ndt(
   const NDTImplementType & ndt_mode)
@@ -111,18 +128,56 @@ std::shared_ptr<NormalDistributionsTransformBase<PointSource, PointTarget>> get_
   throw std::runtime_error(s);
 }
 
+template <typename PointSource, typename PointTarget>
+void set_ndt_params(
+  std::shared_ptr<NormalDistributionsTransformBase<PointSource, PointTarget>> & ndt_ptr,
+  const NdtParams & ndt_params,
+  const NDTImplementType & ndt_mode)
+{
+  if (ndt_mode == NDTImplementType::OMP) {
+    using T = NormalDistributionsTransformOMP<PointSource, PointTarget>;
+
+    // FIXME(IshitaTakeshi) Not sure if this is safe
+    std::shared_ptr<T> ndt_omp_ptr = std::dynamic_pointer_cast<T>(ndt_ptr);
+    ndt_omp_ptr->setNeighborhoodSearchMethod(ndt_params.omp_params.search_method);
+    ndt_omp_ptr->setNumThreads(ndt_params.omp_params.num_threads);
+    ndt_ptr->setRegularizationScaleFactor(ndt_params.omp_params.regularization_scale_factor);
+  }
+  ndt_ptr->setTransformationEpsilon(ndt_params.trans_epsilon);
+  ndt_ptr->setStepSize(ndt_params.step_size);
+  ndt_ptr->setResolution(ndt_params.resolution);
+  ndt_ptr->setMaximumIterations(ndt_params.max_iterations);
+}
+
+template <typename PointSource, typename PointTarget>
+NdtParams get_default_ndt_params(
+  rclcpp::Node * node,
+  std::shared_ptr<NormalDistributionsTransformBase<PointSource, PointTarget>> & ndt_ptr)
+{
+  double default_trans_epsilon = ndt_ptr->getTransformationEpsilon();
+  double default_step_size = ndt_ptr->getStepSize();
+  double default_resolution = ndt_ptr->getResolution();
+  int default_max_iterations = ndt_ptr->getMaximumIterations();
+  int default_search_method = static_cast<int>(pclomp::NeighborSearchMethod::KDTREE);
+  int default_num_threads = 1;
+
+  NdtParams ndt_params;
+  ndt_params.trans_epsilon = node->declare_parameter("trans_epsilon", default_trans_epsilon);
+  ndt_params.step_size = node->declare_parameter("step_size", default_step_size);
+  ndt_params.resolution = node->declare_parameter("resolution", default_resolution);
+  ndt_params.max_iterations = node->declare_parameter("max_iterations", default_max_iterations);
+  ndt_params.omp_params.regularization_scale_factor = node->declare_parameter("regularization_scale_factor", 0.01);
+  int search_method = node->declare_parameter("omp_neighborhood_search_method", default_search_method);
+  ndt_params.omp_params.search_method = static_cast<pclomp::NeighborSearchMethod>(search_method);
+  int num_threads = node->declare_parameter("omp_num_threads", default_num_threads);
+  ndt_params.omp_params.num_threads = std::max(num_threads, 1);
+  return ndt_params;
+}
+
 class NDTScanMatcher : public rclcpp::Node
 {
   using PointSource = pcl::PointXYZ;
   using PointTarget = pcl::PointXYZ;
-
-  // TODO(Tier IV): move file
-  struct OMPParams
-  {
-    OMPParams() : search_method(pclomp::NeighborSearchMethod::KDTREE), num_threads(1) {}
-    pclomp::NeighborSearchMethod search_method;
-    int num_threads;
-  };
 
 public:
   NDTScanMatcher();
@@ -242,7 +297,7 @@ private:
   std::mutex ndt_ptr_mtx_;
   std::mutex initial_pose_array_mtx_;
 
-  OMPParams omp_params_;
+  NdtParams ndt_params_;
 
   std::thread diagnostic_thread_;
   std::map<std::string, std::string> key_value_stdmap_;
