@@ -181,6 +181,7 @@ NDTScanMatcher::NDTScanMatcher()
   ndt_ptr_->setRegularizationScaleFactor(regularization_scale_factor_);
 
   copyNDT(ndt_ptr_, backup_ndt_ptr_, ndt_implement_type_);
+  
 
   RCLCPP_INFO(
     get_logger(), "trans_epsilon: %lf, step_size: %lf, resolution: %lf, max_iterations: %d",
@@ -226,8 +227,8 @@ NDTScanMatcher::NDTScanMatcher()
   rclcpp::CallbackGroup::SharedPtr main_callback_group;
   main_callback_group = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
 
-  rclcpp::CallbackGroup::SharedPtr map_callback_group;
-  map_callback_group = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  // rclcpp::CallbackGroup::SharedPtr map_callback_group_;
+  map_callback_group_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
 
   auto initial_pose_sub_opt = rclcpp::SubscriptionOptions();
   initial_pose_sub_opt.callback_group = initial_pose_callback_group;
@@ -236,7 +237,7 @@ NDTScanMatcher::NDTScanMatcher()
   main_sub_opt.callback_group = main_callback_group;
 
   auto map_sub_opt = rclcpp::SubscriptionOptions();
-  map_sub_opt.callback_group = map_callback_group;
+  map_sub_opt.callback_group = map_callback_group_;
 
   initial_pose_sub_ = this->create_subscription<geometry_msgs::msg::PoseWithCovarianceStamped>(
     "ekf_pose_with_covariance", 100,
@@ -299,7 +300,7 @@ NDTScanMatcher::NDTScanMatcher()
   service_ = this->create_service<tier4_localization_msgs::srv::PoseWithCovarianceStamped>(
     "ndt_align_srv",
     std::bind(&NDTScanMatcher::serviceNDTAlign, this, std::placeholders::_1, std::placeholders::_2),
-    rclcpp::ServicesQoS().get_rmw_qos_profile(), map_callback_group);
+    rclcpp::ServicesQoS().get_rmw_qos_profile(), map_callback_group_);
     // rclcpp::ServicesQoS().get_rmw_qos_profile());
 
   pcd_loader_client_ = this->create_client<autoware_map_msgs::srv::LoadPCDMapsGeneral>(
@@ -316,7 +317,7 @@ NDTScanMatcher::NDTScanMatcher()
   auto period_ns =
     std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::duration<double>(map_update_dt));
   map_update_timer_ = rclcpp::create_timer(
-    this, get_clock(), period_ns, std::bind(&NDTScanMatcher::mapUpdateTimerCallback, this), map_callback_group);
+    this, get_clock(), period_ns, std::bind(&NDTScanMatcher::mapUpdateTimerCallback, this), map_callback_group_);
 
   diagnostic_thread_ = std::thread(&NDTScanMatcher::timerDiagnostic, this);
   diagnostic_thread_.detach();
