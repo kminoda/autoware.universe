@@ -294,7 +294,8 @@ private:
 
   bool ndt_service_align_in_progress_{false};
   
-  
+  rclcpp::CallbackGroup::SharedPtr map_callback_group_;
+
 };
 
 #endif  // NDT_SCAN_MATCHER__NDT_SCAN_MATCHER_CORE_HPP_
