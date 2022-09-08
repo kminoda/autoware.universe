@@ -44,8 +44,6 @@ public:
       std::bind(&PcdMapTFGeneratorNode::onPointCloud, this, std::placeholders::_1));
 
     static_broadcaster_ = std::make_shared<tf2_ros::StaticTransformBroadcaster>(this);
-
-    RCLCPP_INFO_STREAM(get_logger(), "COOOOOOOOOOOOOOOOOOOOOOOOOOOOOl");
   }
 
 private:
@@ -57,7 +55,6 @@ private:
 
   void onPointCloud(const sensor_msgs::msg::PointCloud2::ConstSharedPtr clouds_ros)
   {
-    RCLCPP_INFO_STREAM(get_logger(), "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
     // fix random seed to produce the same viewer position every time
     // 3939 is just the author's favorite number
     srand(3939);

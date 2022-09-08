@@ -71,8 +71,6 @@ EKFLocalizer::EKFLocalizer(const std::string & node_name, const rclcpp::NodeOpti
 
   is_initialized_ = false;
 
-  is_initialized_ = false;
-
   /* initialize ros system */
   auto period_control_ns =
     std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::duration<double>(ekf_dt_));

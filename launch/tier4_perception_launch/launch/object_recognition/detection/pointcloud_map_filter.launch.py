@@ -53,7 +53,7 @@ class PointcloudMapFilterPipeline:
                 name="voxel_based_compare_map_filter",
                 remappings=[
                     ("input", LaunchConfiguration("input_topic")),
-                    ("map", "/map/pointcloud_map/partial"),
+                    ("map", "/map/pointcloud_map"),
                     ("output", LaunchConfiguration("output_topic")),
                 ],
                 parameters=[
@@ -101,7 +101,7 @@ class PointcloudMapFilterPipeline:
                 name="voxel_based_compare_map_filter",
                 remappings=[
                     ("input", down_sample_topic),
-                    ("map", "/map/pointcloud_map/partial"),
+                    ("map", "/map/pointcloud_map"),
                     ("output", LaunchConfiguration("output_topic")),
                 ],
                 parameters=[

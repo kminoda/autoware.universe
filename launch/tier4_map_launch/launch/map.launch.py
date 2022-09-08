@@ -12,18 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-
-from ament_index_python.packages import get_package_share_directory
 import launch
 from launch.actions import DeclareLaunchArgument
 from launch.actions import GroupAction
-from launch.actions import IncludeLaunchDescription
 from launch.actions import OpaqueFunction
 from launch.actions import SetLaunchConfiguration
 from launch.conditions import IfCondition
 from launch.conditions import UnlessCondition
-from launch.launch_description_sources import AnyLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import ComposableNodeContainer
 from launch_ros.actions import Node
@@ -82,12 +77,7 @@ def launch_setup(context, *args, **kwargs):
         package="map_loader",
         plugin="PointCloudMapLoaderNode",
         name="pointcloud_map_loader",
-        remappings=[
-            ("output/pointcloud_map/whole", "pointcloud_map/whole"),
-            ("output/pointcloud_map/partial", "pointcloud_map/partial"),
-            ("load_pcd_partially", "load_pcd_partially"),
-            ("load_pcd_partially/publish", "load_pcd_partially/publish"),
-        ],
+        remappings=[("output/pointcloud_map/whole", "pointcloud_map/whole")],
         parameters=[
             {"pcd_paths_or_directory": ["[", LaunchConfiguration("pointcloud_map_path"), "]"]}
         ],
@@ -125,20 +115,11 @@ def launch_setup(context, *args, **kwargs):
             PushRosNamespace("map"),
             container,
             map_hash_generator,
+            map_tf_generator,
         ]
     )
 
     return [group]
-
-
-# def get_map_provider():
-#     map_provider_launch_file = os.path.join(
-#         get_package_share_directory("map_provider"), "launch", "map_provider.launch.xml"
-#     )
-#     map_provider_launcher = IncludeLaunchDescription(
-#         AnyLaunchDescriptionSource(map_provider_launch_file)
-#     )
-#     return map_provider_launcher
 
 
 def generate_launch_description():
@@ -189,6 +170,5 @@ def generate_launch_description():
             set_container_executable,
             set_container_mt_executable,
         ]
-        # + [get_map_provider()]
         + [OpaqueFunction(function=launch_setup)]
     )
