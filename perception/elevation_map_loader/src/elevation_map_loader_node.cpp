@@ -127,7 +127,7 @@ void ElevationMapLoaderNode::publish()
       RCLCPP_INFO(this->get_logger(), "Create elevation map from pointcloud map ");
       createElevationMap();
     }
-  }
+  // }
 
   elevation_map_.setFrameId(map_frame_);
   auto msg = grid_map::GridMapRosConverter::toMessage(elevation_map_);
