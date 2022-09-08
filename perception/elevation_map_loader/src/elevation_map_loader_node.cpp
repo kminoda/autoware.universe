@@ -91,15 +91,20 @@ ElevationMapLoaderNode::ElevationMapLoaderNode(const rclcpp::NodeOptions & optio
     std::bind(&ElevationMapLoaderNode::onPointcloudMap, this, _1));
   sub_vector_map_ = this->create_subscription<autoware_auto_mapping_msgs::msg::HADMapBin>(
     "input/vector_map", durable_qos, std::bind(&ElevationMapLoaderNode::onVectorMap, this, _1));
+  // publish();
+
 }
 
 void ElevationMapLoaderNode::publish()
 {
-  struct stat info;
-  if (stat(data_manager_.elevation_map_path_->c_str(), &info) != 0) {
-    RCLCPP_INFO(this->get_logger(), "Create elevation map from pointcloud map ");
-    createElevationMap();
-  } else if (info.st_mode & S_IFDIR) {
+  // struct stat info;
+  // if (stat(data_manager_.elevation_map_path_->c_str(), &info) != 0) {
+  //   RCLCPP_INFO(this->get_logger(), "Create elevation map from pointcloud map ");
+  //   createElevationMap();
+  // } else if (info.st_mode & S_IFDIR) {
+    data_manager_.elevation_map_path_ = std::make_unique<std::filesystem::path>(
+      std::filesystem::path(elevation_map_directory_) / "elevation_map_eneos/elevation_map_eneos_0.db3"
+    );
     RCLCPP_INFO(
       this->get_logger(), "Load elevation map from: %s",
       data_manager_.elevation_map_path_->c_str());
@@ -144,9 +149,9 @@ void ElevationMapLoaderNode::onMapHash(
   const auto elevation_map_hash = map_hash->pcd;
   data_manager_.elevation_map_path_ = std::make_unique<std::filesystem::path>(
     std::filesystem::path(elevation_map_directory_) / elevation_map_hash);
-  if (data_manager_.isInitialized()) {
+  // if (data_manager_.isInitialized()) {
     publish();
-  }
+  // }
 }
 
 void ElevationMapLoaderNode::onPointcloudMap(

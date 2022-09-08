@@ -30,6 +30,7 @@
   <depend>tf2_sensor_msgs</depend>
   <depend>tier4_autoware_utils</depend>
   <depend>tier4_debug_msgs</depend>
+  <depend>autoware_map_msgs</depend>
   <depend>tier4_localization_msgs</depend>
   <depend>visualization_msgs</depend>
 

@@ -29,6 +29,7 @@ add_library(ndt
   src/pcl_generic.cpp
   src/pcl_modified.cpp
   src/omp.cpp
+  src/omp_multi_voxel.cpp
 )
 
 target_include_directories(ndt

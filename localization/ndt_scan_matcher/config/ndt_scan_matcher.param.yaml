@@ -8,8 +8,8 @@
     input_sensor_points_queue_size: 1
 
     # NDT implementation type
-    # 0=PCL_GENERIC, 1=PCL_MODIFIED, 2=OMP
-    ndt_implement_type: 2
+    # 0=PCL_GENERIC, 1=PCL_MODIFIED, 2=OMP, 3=OMP_MULTI_VOXEL
+    ndt_implement_type: 3
 
     # The maximum difference between two consecutive
     # transformations in order to consider convergence
@@ -45,6 +45,9 @@
 
     # Tolerance of distance difference between two initial poses used for linear interpolation. [m]
     initial_pose_distance_tolerance_m: 10.0
+
+    # Timeout duration for waiting a valid map given an initial pose. [sec]
+    initial_ndt_align_timeout_sec: 10.0
 
     # neighborhood search method in OMP
     # 0=KDTREE, 1=DIRECT26, 2=DIRECT7, 3=DIRECT1
