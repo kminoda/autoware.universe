@@ -106,6 +106,7 @@ def launch_setup(context, *args, **kwargs):
             lanelet2_map_loader,
             lanelet2_map_visualization,
             pointcloud_map_loader,
+            map_tf_generator,
         ],
         output="screen",
     )
@@ -115,7 +116,6 @@ def launch_setup(context, *args, **kwargs):
             PushRosNamespace("map"),
             container,
             map_hash_generator,
-            map_tf_generator,
         ]
     )
 
