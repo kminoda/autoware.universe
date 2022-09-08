@@ -16,6 +16,10 @@
       <remap from="load_pcd_partially/publish" to="load_pcd_partially/publish"/>
       <param name="pcd_paths_or_directory" value="[$(var pointcloud_map_path)]"/>
     </node>
+
+    <include file="$(find-pkg-share map_tf_generator)/launch/map_tf_generator.launch.xml">
+      <arg name="input_vector_map_topic" value="/map/vector_map"/>
+    </include>
   </group>
 
   <include file="$(find-pkg-share map_provider)/launch/map_provider.launch.xml"/>

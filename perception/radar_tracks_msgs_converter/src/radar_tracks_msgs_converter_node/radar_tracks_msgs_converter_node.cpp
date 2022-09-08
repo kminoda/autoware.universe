@@ -82,8 +82,9 @@ RadarTracksMsgsConverterNode::RadarTracksMsgsConverterNode(const rclcpp::NodeOpt
   sub_radar_ = create_subscription<RadarTracks>(
     "~/input/radar_objects", rclcpp::QoS{1},
     std::bind(&RadarTracksMsgsConverterNode::onRadarTracks, this, _1));
-  sub_twist_ = create_subscription<TwistStamped>(
-    "~/input/twist", rclcpp::QoS{1}, std::bind(&RadarTracksMsgsConverterNode::onTwist, this, _1));
+  sub_odometry_ = create_subscription<Odometry>(
+    "~/input/odometry", rclcpp::QoS{1},
+    std::bind(&RadarTracksMsgsConverterNode::onTwist, this, _1));
   transform_listener_ = std::make_shared<tier4_autoware_utils::TransformListener>(this);
 
   // Publisher
@@ -100,9 +101,9 @@ void RadarTracksMsgsConverterNode::onRadarTracks(const RadarTracks::ConstSharedP
   radar_data_ = msg;
 }
 
-void RadarTracksMsgsConverterNode::onTwist(const TwistStamped::ConstSharedPtr msg)
+void RadarTracksMsgsConverterNode::onTwist(const Odometry::ConstSharedPtr msg)
 {
-  twist_data_ = msg;
+  odometry_data_ = msg;
 }
 
 rcl_interfaces::msg::SetParametersResult RadarTracksMsgsConverterNode::onSetParam(
@@ -117,6 +118,7 @@ rcl_interfaces::msg::SetParametersResult RadarTracksMsgsConverterNode::onSetPara
 
       // Update params
       update_param(params, "update_rate_hz", p.update_rate_hz);
+      update_param(params, "new_frame_id", p.new_frame_id);
       update_param(params, "use_twist_compensation", p.use_twist_compensation);
     }
   } catch (const rclcpp::exceptions::InvalidParameterTypeException & e) {
@@ -201,12 +203,12 @@ TrackedObjects RadarTracksMsgsConverterNode::convertRadarTrackToTrackedObjects()
 
     // twist compensation
     if (node_param_.use_twist_compensation) {
-      if (twist_data_) {
-        kinematics.twist_with_covariance.twist.linear.x += twist_data_->twist.linear.x;
-        kinematics.twist_with_covariance.twist.linear.y += twist_data_->twist.linear.y;
-        kinematics.twist_with_covariance.twist.linear.z += twist_data_->twist.linear.z;
+      if (odometry_data_) {
+        kinematics.twist_with_covariance.twist.linear.x += odometry_data_->twist.twist.linear.x;
+        kinematics.twist_with_covariance.twist.linear.y += odometry_data_->twist.twist.linear.y;
+        kinematics.twist_with_covariance.twist.linear.z += odometry_data_->twist.twist.linear.z;
       } else {
-        RCLCPP_INFO(get_logger(), "Twist data is not coming");
+        RCLCPP_INFO(get_logger(), "Odometry data is not coming");
       }
     }
 

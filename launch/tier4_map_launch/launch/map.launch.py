@@ -94,6 +94,19 @@ def launch_setup(context, *args, **kwargs):
         extra_arguments=[{"use_intra_process_comms": LaunchConfiguration("use_intra_process")}],
     )
 
+    map_tf_generator = ComposableNode(
+        package="map_tf_generator",
+        plugin="VectorMapTFGeneratorNode",
+        name="vector_map_tf_generator",
+        parameters=[
+            {
+                "map_frame": "map",
+                "viewer_frame": "viewer",
+            }
+        ],
+        extra_arguments=[{"use_intra_process_comms": LaunchConfiguration("use_intra_process")}],
+    )
+
     container = ComposableNodeContainer(
         name="map_container",
         namespace="",
