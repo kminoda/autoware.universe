@@ -103,7 +103,7 @@ void ElevationMapLoaderNode::publish()
   //   createElevationMap();
   // } else if (info.st_mode & S_IFDIR) {
     data_manager_.elevation_map_path_ = std::make_unique<std::filesystem::path>(
-      std::filesystem::path(elevation_map_directory_) / "elevation_map_eneos/elevation_map_eneos_0.db3"
+      std::filesystem::path(elevation_map_directory_) / "elevation_map/elevation_map_0.db3"
     );
     RCLCPP_INFO(
       this->get_logger(), "Load elevation map from: %s",
