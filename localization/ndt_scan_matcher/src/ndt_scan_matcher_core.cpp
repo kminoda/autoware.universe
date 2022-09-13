@@ -105,9 +105,11 @@ bool isLocalOptimalSolutionOscillation(
 }
 
 template <typename T, typename U>
-double calculateDistance(const T p1, const U p2)
+double norm_xy(const T p1, const U p2)
 {
-  return std::sqrt(std::pow(p1.x - p2.x, 2.0) + std::pow(p1.y - p2.y, 2.0));
+  double dx = p1.x - p2.x;
+  double dy = p1.y - p2.y;
+  return std::sqrt(dx * dx + dy * dy);
 }
 
 NDTScanMatcher::NDTScanMatcher()
@@ -261,7 +263,7 @@ NDTScanMatcher::NDTScanMatcher()
   ekf_odom_sub_ =
     this->create_subscription<nav_msgs::msg::Odometry>(
       "ekf_odom", 100,
-      std::bind(&NDTScanMatcher::callbackEKFOdom, this, std::placeholders::_1), map_sub_opt);
+      std::bind(&NDTScanMatcher::callbackEKFOdom, this, std::placeholders::_1), main_sub_opt);
 
   sensor_aligned_pose_pub_ =
     this->create_publisher<sensor_msgs::msg::PointCloud2>("points_aligned", 10);
@@ -416,9 +418,14 @@ void NDTScanMatcher::serviceNDTAlign(
 
 void NDTScanMatcher::callbackEKFOdom(nav_msgs::msg::Odometry::ConstSharedPtr odom_ptr)
 {
-  // (void)odom_ptr;
   current_position_ptr_ = std::make_shared<geometry_msgs::msg::Point>(odom_ptr->pose.pose.position);
-  // std::cout << "KOJI EKF.x = " << current_position_ptr_->x << std::endl;
+  
+  double distance = norm_xy(*current_position_ptr_, *last_update_position_ptr_);
+  double LIDAR_CROP_DISTANCE = 100;
+  std::cout << "KOJI distance " << distance << std::endl;;
+  if (distance + LIDAR_CROP_DISTANCE > dml_loading_radius_) {
+    RCLCPP_ERROR(get_logger(), "Dynamic map loading is not keeping up.");
+  }
 }
 
 void NDTScanMatcher::mapUpdateTimerCallback()
@@ -445,7 +452,7 @@ void NDTScanMatcher::mapUpdateTimerCallback()
 bool NDTScanMatcher::shouldUpdateMap(const geometry_msgs::msg::Point & position)
 {
   if (last_update_position_ptr_ == nullptr) return false;
-  double distance = calculateDistance(position, *last_update_position_ptr_);
+  double distance = norm_xy(position, *last_update_position_ptr_);
   return distance > dml_update_map_distance_;
 }
 
