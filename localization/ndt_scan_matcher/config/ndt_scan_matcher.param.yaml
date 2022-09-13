@@ -73,3 +73,9 @@
 
     # Regularization scale factor
     regularization_scale_factor: 0.01
+
+    # Update map distance (for dynamic map loading)
+    dml_update_map_distance: 20
+
+    # Loading radius (for dynamic map loading)
+    dml_loading_radius: 100

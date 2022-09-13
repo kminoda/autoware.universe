@@ -129,7 +129,9 @@ NDTScanMatcher::NDTScanMatcher()
   oscillation_threshold_(10),
   initial_ndt_align_timeout_sec_(3.0),
   regularization_enabled_(declare_parameter("regularization_enabled", false)),
-  regularization_scale_factor_(declare_parameter("regularization_scale_factor", 0.01))
+  regularization_scale_factor_(declare_parameter("regularization_scale_factor", 0.01)),
+  dml_update_map_distance_(declare_parameter("dml_update_map_distance", 10)),
+  dml_loading_radius_(declare_parameter("dml_loading_radius", 100))
 {
   key_value_stdmap_["state"] = "Initializing";
 
@@ -309,8 +311,6 @@ NDTScanMatcher::NDTScanMatcher()
     RCLCPP_INFO(get_logger(), "Waiting for pcd loader service...");
   }
   last_update_position_ptr_ = nullptr;
-  update_threshold_distance_ = 10.0; // TODO koji minoda kokoyabai
-  loading_radius_ = 100; // TODO koji minoda kokoyabai
   current_position_ptr_ = nullptr;
 
   double map_update_dt = 1.0;
@@ -446,7 +446,7 @@ bool NDTScanMatcher::shouldUpdateMap(const geometry_msgs::msg::Point & position)
 {
   if (last_update_position_ptr_ == nullptr) return false;
   double distance = calculateDistance(position, *last_update_position_ptr_);
-  return distance > update_threshold_distance_;
+  return distance > dml_update_map_distance_;
 }
 
 void NDTScanMatcher::updateMap(const geometry_msgs::msg::Point & position)
@@ -455,7 +455,7 @@ void NDTScanMatcher::updateMap(const geometry_msgs::msg::Point & position)
   auto request = std::make_shared<autoware_map_msgs::srv::LoadPCDMapsGeneral::Request>();
   request->mode = 1; // differential load
   request->area.center = position;
-  request->area.radius = loading_radius_;
+  request->area.radius = dml_loading_radius_;
   request->already_loaded_ids = getCurrentMapIDs(ndt_ptr_);
 
   // send a request to map_loader

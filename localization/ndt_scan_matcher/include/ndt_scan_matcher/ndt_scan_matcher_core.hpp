@@ -288,8 +288,8 @@ private:
   std::condition_variable condition_;
   bool value_ready_ = false;
   geometry_msgs::msg::Point::SharedPtr last_update_position_ptr_;
-  double update_threshold_distance_;
-  double loading_radius_;
+  double dml_update_map_distance_;
+  double dml_loading_radius_;
   geometry_msgs::msg::Point::SharedPtr current_position_ptr_;
 
   bool ndt_service_align_in_progress_{false};
