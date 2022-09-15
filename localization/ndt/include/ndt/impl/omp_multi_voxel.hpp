@@ -93,6 +93,14 @@ void NormalDistributionsTransformOMPMultiVoxel<PointSource, PointTarget>::setInp
   const pcl::shared_ptr<pcl::PointCloud<PointSource>> & scan_ptr)
 {
   ndt_ptr_->setInputSource(scan_ptr);
+  scan_ptr_ = scan_ptr;
+}
+
+template <class PointSource, class PointTarget>
+pcl::shared_ptr<pcl::PointCloud<PointSource>>
+  NormalDistributionsTransformOMPMultiVoxel<PointSource, PointTarget>::getInputSourceTempKOJI()
+{
+  return scan_ptr_;
 }
 
 template <class PointSource, class PointTarget>

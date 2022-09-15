@@ -1,4 +1,4 @@
-// Copyright 2020 Autoware Foundation
+// Copyright 2022 TIER IV, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,20 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "pose_initializer/pose_initializer_core.hpp"
+#ifndef AUTOWARE_AD_API_SPECS__INTERFACE_HPP_
+#define AUTOWARE_AD_API_SPECS__INTERFACE_HPP_
 
-#include <rclcpp/rclcpp.hpp>
+#include <autoware_adapi_version_msgs/srv/interface_version.hpp>
 
-#include <memory>
-
-int main(int argc, char ** argv)
+namespace autoware_ad_api::interface
 {
-  rclcpp::init(argc, argv);
-  rclcpp::executors::MultiThreadedExecutor executor;
-  auto node = std::make_shared<PoseInitializer>();
-  executor.add_node(node);
-  executor.spin();
-  executor.remove_node(node);
-  rclcpp::shutdown();
-  return 0;
-}
+
+struct Version
+{
+  using Service = autoware_adapi_version_msgs::srv::InterfaceVersion;
+  static constexpr char name[] = "/api/interface/version";
+};
+
+}  // namespace autoware_ad_api::interface
+
+#endif  // AUTOWARE_AD_API_SPECS__INTERFACE_HPP_

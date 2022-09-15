@@ -1,4 +1,4 @@
-// Copyright 2022 TIER IV, Inc.
+// Copyright 2022 The Autoware Contributors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,20 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef DEFAULT_AD_API__SPECS__INTERFACE__VERSION_HPP_
-#define DEFAULT_AD_API__SPECS__INTERFACE__VERSION_HPP_
+#include "map_height_fitter_core.hpp"
 
-#include "autoware_ad_api_msgs/srv/interface_version.hpp"
+#include <memory>
 
-namespace ad_api::interface::version
+int main(int argc, char ** argv)
 {
-
-struct T
-{
-  using Service = autoware_ad_api_msgs::srv::InterfaceVersion;
-  static constexpr char name[] = "/api/interface/version";
-};
-
-}  // namespace ad_api::interface::version
-
-#endif  // DEFAULT_AD_API__SPECS__INTERFACE__VERSION_HPP_
+  rclcpp::init(argc, argv);
+  rclcpp::executors::SingleThreadedExecutor executor;
+  auto node = std::make_shared<MapHeightFitter>();
+  executor.add_node(node);
+  executor.spin();
+  executor.remove_node(node);
+  rclcpp::shutdown();
+}

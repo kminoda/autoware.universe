@@ -238,6 +238,7 @@ void NDTScanMatchingModule::callback_sensor_points(
   transform_sensor_measurement(
     sensor_frame, base_frame_, sensor_points_sensorTF_ptr, sensor_points_baselinkTF_ptr);
   (*ndt_ptr_ptr_)->setInputSource(sensor_points_baselinkTF_ptr);
+  std::cout << "ndt_scan_matcher KOJI PUT SOURCE !!!!!!!!!!!!!! @ " << *ndt_ptr_ptr_ << std::endl;
 
   // calculate initial pose
   std::unique_lock<std::mutex> initial_pose_array_lock(initial_pose_array_mtx_);
@@ -524,6 +525,7 @@ void NDTScanMatchingModule::serviceTriggerNode(
   const std_srvs::srv::SetBool::Request::SharedPtr req,
   std_srvs::srv::SetBool::Response::SharedPtr res)
 {
+  // (void)req; (void)res;
   if (req->data) {
     std::lock_guard<std::mutex> initial_pose_array_lock(initial_pose_array_mtx_);
     initial_pose_msg_ptr_array_.clear();

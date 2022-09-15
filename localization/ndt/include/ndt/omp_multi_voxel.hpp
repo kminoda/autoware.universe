@@ -42,6 +42,8 @@ public:
   NdtResult align(const geometry_msgs::msg::Pose & initial_pose_msg) override;
   void setInputTarget(const pcl::shared_ptr<pcl::PointCloud<PointTarget>> & map_ptr) override;
   void setInputSource(const pcl::shared_ptr<pcl::PointCloud<PointSource>> & scan_ptr) override;
+  pcl::shared_ptr<pcl::PointCloud<PointSource>> getInputSourceTempKOJI();
+
   NDTImplementType getImplementationType() override;
 
   void setOMPMultiVoxelParam(const OMPMultiVoxelParam & omp_param);
@@ -91,6 +93,8 @@ public:
   pcl::shared_ptr<pclomp::NormalDistributionsTransformMultiVoxel<PointSource, PointTarget>> getNDTPtr() const;
   pcl::PointCloud<PointTarget> getVoxelPCD() const;
   std::vector<std::string> getCurrentMapIDs() const;
+
+  pcl::shared_ptr<pcl::PointCloud<PointSource>> scan_ptr_;
 
 private:
   pcl::shared_ptr<pclomp::NormalDistributionsTransformMultiVoxel<PointSource, PointTarget>> ndt_ptr_;

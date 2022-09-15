@@ -104,6 +104,7 @@ void MapUpdateModule::service_ndt_align(
   const auto mapTF_initial_pose_msg = transform(req->pose_with_covariance, *TF_pose_to_map_ptr);
   update_map(mapTF_initial_pose_msg.pose.pose.position);
 
+  std::cout << "ndt_scan_matcher KOJI CHECK INPUT SOURCE.......... @ " << *ndt_ptr_ptr_ << std::endl;
   if ((*ndt_ptr_ptr_)->getInputSource() == nullptr) {
     res->success = false;
     RCLCPP_WARN(logger_, "No InputSource");
@@ -201,6 +202,9 @@ void MapUpdateModule::update_ndt_with_new_map(
   if ((*ndt_ptr_ptr_)->getImplementationType() == NDTImplementType::OMP_MULTI_VOXEL) {
     using T = NormalDistributionsTransformOMPMultiVoxel<PointSource, PointTarget>;
     std::shared_ptr<T> backup_ndt_omp_ptr = std::dynamic_pointer_cast<T>(backup_ndt_ptr_);
+
+    backup_ndt_omp_ptr->setInputSource(
+      std::dynamic_pointer_cast<T>(*ndt_ptr_ptr_)->getInputSourceTempKOJI());
 
     // Add pcd
     for (const auto & map_to_add: maps_to_add) {

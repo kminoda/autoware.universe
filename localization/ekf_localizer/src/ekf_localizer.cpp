@@ -77,6 +77,7 @@ EKFLocalizer::EKFLocalizer(const std::string & node_name, const rclcpp::NodeOpti
   proc_cov_yaw_d_ = std::pow(proc_stddev_yaw_c_ * ekf_dt_, 2.0);
 
   is_activated_ = false;
+  // is_activated_ = true;
 
   /* initialize ros system */
   auto period_control_ns =
@@ -712,6 +713,7 @@ void EKFLocalizer::serviceTriggerNode(
   const std_srvs::srv::SetBool::Request::SharedPtr req,
   std_srvs::srv::SetBool::Response::SharedPtr res)
 {
+  // (void)req; (void)res;
   if (req->data) {
     while (!current_pose_info_queue_.empty()) current_pose_info_queue_.pop();
     while (!current_twist_info_queue_.empty()) current_twist_info_queue_.pop();

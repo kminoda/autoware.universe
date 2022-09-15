@@ -31,6 +31,8 @@ def _create_api_node(node_name, class_name, **kwargs):
 def generate_launch_description():
     components = [
         _create_api_node("interface", "InterfaceNode"),
+        _create_api_node("localization", "LocalizationNode"),
+        _create_api_node("routing", "RoutingNode"),
     ]
     container = ComposableNodeContainer(
         namespace="default_ad_api",
@@ -39,9 +41,10 @@ def generate_launch_description():
         executable="component_container_mt",
         composable_node_descriptions=components,
     )
-    web_server = Node(
-        package="default_ad_api",
-        name="web_server",
-        executable="web_server.py",
-    )
-    return launch.LaunchDescription([container, web_server])
+    # web_server = Node(
+    #     package="default_ad_api",
+    #     name="web_server",
+    #     executable="web_server.py",
+    # )
+    # return launch.LaunchDescription([container, web_server])
+    return launch.LaunchDescription([container])

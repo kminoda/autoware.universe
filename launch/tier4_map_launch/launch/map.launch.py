@@ -126,7 +126,7 @@ def launch_setup(context, *args, **kwargs):
         [
             PushRosNamespace("map"),
             container,
-            map_hash_generator,
+            # map_hash_generator,
         ]
     )
 
