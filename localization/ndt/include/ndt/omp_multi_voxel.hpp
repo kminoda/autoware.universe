@@ -30,7 +30,7 @@ class NormalDistributionsTransformOMPMultiVoxel
 {
 public:
   NormalDistributionsTransformOMPMultiVoxel();
-  // NormalDistributionsTransformOMPMultiVoxel(const NormalDistributionsTransformOMPMultiVoxel<PointSource, PointTarget> & obj);
+  NormalDistributionsTransformOMPMultiVoxel(const NormalDistributionsTransformOMPMultiVoxel<PointSource, PointTarget> & obj);
   ~NormalDistributionsTransformOMPMultiVoxel() = default;
 
   void align(pcl::PointCloud<PointSource> & output, const Eigen::Matrix4f & guess) override;
@@ -70,18 +70,13 @@ public:
 
   // only OMP Impl
   void setNumThreads(int n);
-  // void setNeighborhoodSearchMethod(pclomp::NeighborSearchMethod method);
 
   int getNumThreads() const;
-  // pclomp::NeighborSearchMethod getNeighborhoodSearchMethod() const;
 
   void setInputTarget(
     const pcl::shared_ptr<pcl::PointCloud<PointTarget>> & map_ptr, const std::string map_id);
   void removeTarget(const std::string map_id);
   void createVoxelKdtree();
-  // void getVoxelPCD(pcl::PointCloud<PointTarget> & output);
-  // void getNDTPtr(pcl::shared_ptr<pclomp::NormalDistributionsTransformMultiVoxel<PointSource, PointTarget>> & output) const;
-  void copyFrom(const NormalDistributionsTransformOMPMultiVoxel<PointSource, PointTarget> & input);
   pcl::shared_ptr<pclomp::NormalDistributionsTransformMultiVoxel<PointSource, PointTarget>> getNDTPtr() const;
   pcl::PointCloud<PointTarget> getVoxelPCD() const;
   std::vector<std::string> getCurrentMapIDs() const;

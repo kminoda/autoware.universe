@@ -133,10 +133,10 @@ void copyNDT(
     using T = NormalDistributionsTransformOMPMultiVoxel<PointSource, PointTarget>;
     std::shared_ptr<T> input_ndt_tmp_ptr = std::dynamic_pointer_cast<T>(input_ndt_ptr);
     std::shared_ptr<T> output_ndt_tmp_ptr = std::dynamic_pointer_cast<T>(output_ndt_ptr);
-    output_ndt_tmp_ptr->copyFrom(*input_ndt_tmp_ptr);
+    // output_ndt_tmp_ptr->copyFrom(*input_ndt_tmp_ptr);
 
-    // T copied_ndt_tmp = *input_ndt_tmp_ptr;
-    // output_ndt_tmp_ptr = std::make_shared<T>(copied_ndt_tmp);
+    T copied_ndt_tmp = *input_ndt_tmp_ptr;
+    output_ndt_tmp_ptr = std::make_shared<T>(copied_ndt_tmp);
   } else {
     const std::string s = fmt::format("Unknown NDT type {}", static_cast<int>(ndt_mode));
     throw std::runtime_error(s);
