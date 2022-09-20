@@ -155,11 +155,17 @@ NDTScanMatcher::NDTScanMatcher()
   } else if (ndt_implement_type_ == NDTImplementType::OMP_MULTI_VOXEL) {
     using T = NormalDistributionsTransformOMPMultiVoxel<PointSource, PointTarget>;
     std::shared_ptr<T> ndt_omp_ptr = std::dynamic_pointer_cast<T>(ndt_ptr_);
+    std::cout << "KOJI Before: " << ndt_omp_ptr->getNumThreads() << std::endl;
+
     omp_params_.num_threads = this->declare_parameter("omp_num_threads", omp_params_.num_threads);
     omp_params_.num_threads = std::max(omp_params_.num_threads, 1);
     ndt_omp_ptr->setNumThreads(omp_params_.num_threads);
   }
-
+  {
+    using T = NormalDistributionsTransformOMPMultiVoxel<PointSource, PointTarget>;
+    std::shared_ptr<T> ndt_omp_ptr = std::dynamic_pointer_cast<T>(ndt_ptr_);
+    std::cout << "KOJI After: " << ndt_omp_ptr->getNumThreads() << std::endl;
+  }
   int points_queue_size = this->declare_parameter("input_sensor_points_queue_size", 0);
   points_queue_size = std::max(points_queue_size, 0);
   RCLCPP_INFO(get_logger(), "points_queue_size: %d", points_queue_size);
@@ -184,8 +190,10 @@ NDTScanMatcher::NDTScanMatcher()
   ndt_ptr_->setMaximumIterations(max_iterations);
   ndt_ptr_->setRegularizationScaleFactor(regularization_scale_factor_);
 
-  copyNDT(ndt_ptr_, backup_ndt_ptr_, ndt_implement_type_);
-  
+  // copyNDT(ndt_ptr_, backup_ndt_ptr_, ndt_implement_type_);
+  std::cout << "Before: " << backup_ndt_ptr_->getStepSize() << std::endl;
+  backup_ndt_ptr_ = copyNDT(ndt_ptr_, ndt_implement_type_);
+  std::cout << "After: " << backup_ndt_ptr_->getStepSize() << std::endl;
 
   RCLCPP_INFO(
     get_logger(), "trans_epsilon: %lf, step_size: %lf, resolution: %lf, max_iterations: %d",
@@ -422,9 +430,9 @@ void NDTScanMatcher::callbackEKFOdom(nav_msgs::msg::Odometry::ConstSharedPtr odo
   
   double distance = norm_xy(*current_position_ptr_, *last_update_position_ptr_);
   double LIDAR_CROP_DISTANCE = 100;
-  std::cout << "KOJI distance " << distance << std::endl;;
+  // std::cout << "KOJI distance " << distance << std::endl;;
   if (distance + LIDAR_CROP_DISTANCE > dml_loading_radius_) {
-    RCLCPP_ERROR(get_logger(), "Dynamic map loading is not keeping up.");
+    RCLCPP_ERROR_STREAM_THROTTLE(this->get_logger(), *this->get_clock(), 1, "Dynamic map loading is not keeping up.");
   }
 }
 
@@ -553,7 +561,8 @@ void NDTScanMatcher::updateNdtWithNewMap(
   ndt_map_mtx_.unlock();
 
   publishPartialPCDMap();
-  copyNDT(ndt_ptr_, backup_ndt_ptr_, ndt_implement_type_);
+  // copyNDT(ndt_ptr_, backup_ndt_ptr_, ndt_implement_type_);
+  backup_ndt_ptr_ = copyNDT(ndt_ptr_, ndt_implement_type_);
 }
 
 
