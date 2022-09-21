@@ -561,7 +561,6 @@ void NDTScanMatcher::updateNdtWithNewMap(
   ndt_map_mtx_.unlock();
 
   publishPartialPCDMap();
-  // copyNDT(ndt_ptr_, backup_ndt_ptr_, ndt_implement_type_);
   backup_ndt_ptr_ = copyNDT(ndt_ptr_, ndt_implement_type_);
 }
 
@@ -947,8 +946,6 @@ geometry_msgs::msg::PoseWithCovarianceStamped NDTScanMatcher::alignUsingMonteCar
   result_pose_with_cov_msg.header.frame_id = map_frame_;
   result_pose_with_cov_msg.pose.pose = best_particle_ptr->result_pose;
   // ndt_pose_with_covariance_pub_->publish(result_pose_with_cov_msg);
-  // current_position_ptr_ = std::make_shared<geometry_msgs::msg::Point>(result_pose_with_cov_msg.pose.pose.position); // KOJI
-  // std::cout << "KOJI current.x = " << current_position_ptr_->x << std::endl;
 
   return result_pose_with_cov_msg;
 }

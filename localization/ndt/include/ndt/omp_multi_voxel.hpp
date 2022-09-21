@@ -30,7 +30,6 @@ class NormalDistributionsTransformOMPMultiVoxel
 {
 public:
   NormalDistributionsTransformOMPMultiVoxel();
-  NormalDistributionsTransformOMPMultiVoxel(const NormalDistributionsTransformOMPMultiVoxel<PointSource, PointTarget> & obj);
   ~NormalDistributionsTransformOMPMultiVoxel() = default;
   
   void align(pcl::PointCloud<PointSource> & output, const Eigen::Matrix4f & guess) override;

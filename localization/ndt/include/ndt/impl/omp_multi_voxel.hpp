@@ -28,12 +28,9 @@ NormalDistributionsTransformOMPMultiVoxel<PointSource, PointTarget>::NormalDistr
 template <class PointSource, class PointTarget>
 NormalDistributionsTransformOMPMultiVoxel<PointSource, PointTarget>::NormalDistributionsTransformOMPMultiVoxel(
   const NormalDistributionsTransformOMPMultiVoxel<PointSource, PointTarget> &obj)
-: ndt_ptr_(new pclomp::NormalDistributionsTransformMultiVoxel<PointSource, PointTarget>)
 {
-  // using T = pclomp::NormalDistributionsTransformMultiVoxel<PointSource, PointTarget>;
-  // ndt_ptr_ = pcl::make_shared<T>(*obj.getNDTPtr());
-  ndt_ptr_->copyFrom(*obj.getNDTPtr());
-  std::cout << "After ndt_ptr =" << ndt_ptr_ << std::endl;
+  using T = pclomp::NormalDistributionsTransformMultiVoxel<PointSource, PointTarget>;
+  ndt_ptr_ = pcl::make_shared<T>(*obj.getNDTPtr());
 }
 
 template <class PointSource, class PointTarget>
@@ -254,8 +251,6 @@ template <class PointSource, class PointTarget>
 pcl::shared_ptr<pclomp::NormalDistributionsTransformMultiVoxel<PointSource, PointTarget>> 
   NormalDistributionsTransformOMPMultiVoxel<PointSource, PointTarget>::getNDTPtr() const
 {
-  std::cout << "Before ndt_ptr = " << ndt_ptr_ << std::endl;
-
   return ndt_ptr_;
 }
 
