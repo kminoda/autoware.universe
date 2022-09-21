@@ -428,6 +428,7 @@ void NDTScanMatcher::callbackEKFOdom(nav_msgs::msg::Odometry::ConstSharedPtr odo
 {
   current_position_ptr_ = std::make_shared<geometry_msgs::msg::Point>(odom_ptr->pose.pose.position);
   
+  if (last_update_position_ptr_ == nullptr) {return;}
   double distance = norm_xy(*current_position_ptr_, *last_update_position_ptr_);
   double LIDAR_CROP_DISTANCE = 100;
   // std::cout << "KOJI distance " << distance << std::endl;;
