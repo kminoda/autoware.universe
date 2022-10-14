@@ -33,9 +33,10 @@ public:
   NormalDistributionsTransformPCLModified();
   ~NormalDistributionsTransformPCLModified() = default;
 
-  void align(pcl::PointCloud<PointSource> & output, const Eigen::Matrix4f & guess) override;
+  NdtResult align(const geometry_msgs::msg::Pose & initial_pose_msg) override;
   void setInputTarget(const pcl::shared_ptr<pcl::PointCloud<PointTarget>> & map_ptr) override;
   void setInputSource(const pcl::shared_ptr<pcl::PointCloud<PointSource>> & scan_ptr) override;
+  NDTImplementType getImplementationType() override;
 
   void setMaximumIterations(int max_iter) override;
   void setResolution(float res) override;
@@ -58,6 +59,7 @@ public:
 
   Eigen::Matrix<double, 6, 6> getHessian() const override;
   void setRegularizationScaleFactor(const float) override{};
+  float getRegularizationScaleFactor() override{return 0;};
   void setRegularizationPose(const Eigen::Matrix4f &) override {}
   void unsetRegularizationPose() override {}
 

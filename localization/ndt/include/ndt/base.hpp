@@ -15,6 +15,10 @@
 #ifndef NDT__BASE_HPP_
 #define NDT__BASE_HPP_
 
+#include <tier4_autoware_utils/geometry/geometry.hpp>
+
+#include <geometry_msgs/msg/pose.hpp>
+
 #include <pcl/common/io.h>
 #include <pcl/io/pcd_io.h>
 #include <pcl/point_types.h>
@@ -22,16 +26,40 @@
 
 #include <vector>
 
+struct NdtResult
+{
+  geometry_msgs::msg::Pose pose;
+  float transform_probability;
+  float nearest_voxel_transformation_likelihood;
+  int iteration_num;
+  std::vector<geometry_msgs::msg::Pose> transformation_array;
+};
+
+enum class NDTImplementType { OMP = 0, OMP_MULTI_VOXEL = 1 };
+
 template <class PointSource, class PointTarget>
 class NormalDistributionsTransformBase
 {
 public:
+  struct BaseParam
+  {
+    double trans_epsilon;
+    double step_size;
+    double resolution;
+    int max_iterations;
+    double regularization_scale_factor;
+  };
+
   NormalDistributionsTransformBase();
   virtual ~NormalDistributionsTransformBase() = default;
 
-  virtual void align(pcl::PointCloud<PointSource> & output, const Eigen::Matrix4f & guess) = 0;
+  virtual NdtResult align(const geometry_msgs::msg::Pose & initial_pose_msg) = 0;
   virtual void setInputTarget(const pcl::shared_ptr<pcl::PointCloud<PointTarget>> & map_ptr) = 0;
   virtual void setInputSource(const pcl::shared_ptr<pcl::PointCloud<PointSource>> & scan_ptr) = 0;
+  virtual NDTImplementType getImplementationType() = 0;
+
+  void setParam(const BaseParam & base_param);
+  BaseParam getParam();
 
   virtual void setMaximumIterations(int max_iter) = 0;
   virtual void setResolution(float res) = 0;
@@ -55,6 +83,7 @@ public:
   virtual void setRegularizationPose(const Eigen::Matrix4f &) = 0;
   virtual void unsetRegularizationPose() = 0;
   virtual void setRegularizationScaleFactor(const float) = 0;
+  virtual float getRegularizationScaleFactor() = 0;
 
   virtual Eigen::Matrix<double, 6, 6> getHessian() const = 0;
 

@@ -16,6 +16,7 @@
 #define TIER4_AUTOWARE_UTILS__TIER4_AUTOWARE_UTILS_HPP_
 
 #include "tier4_autoware_utils/geometry/boost_geometry.hpp"
+#include "tier4_autoware_utils/geometry/boost_polygon_utils.hpp"
 #include "tier4_autoware_utils/geometry/geometry.hpp"
 #include "tier4_autoware_utils/geometry/path_with_lane_id_geometry.hpp"
 #include "tier4_autoware_utils/geometry/pose_deviation.hpp"
@@ -26,6 +27,7 @@
 #include "tier4_autoware_utils/ros/debug_publisher.hpp"
 #include "tier4_autoware_utils/ros/debug_traits.hpp"
 #include "tier4_autoware_utils/ros/marker_helper.hpp"
+#include "tier4_autoware_utils/ros/msg_covariance.hpp"
 #include "tier4_autoware_utils/ros/processing_time_publisher.hpp"
 #include "tier4_autoware_utils/ros/self_pose_listener.hpp"
 #include "tier4_autoware_utils/ros/transform_listener.hpp"

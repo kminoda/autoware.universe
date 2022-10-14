@@ -22,13 +22,14 @@ else()
   endif()
 endif()
 
-find_package(PCL REQUIRED COMPONENTS common io registration)
+find_package(PCL REQUIRED COMPONENTS common io registration fmt)
 
 add_library(ndt
   src/base.cpp
-  src/pcl_generic.cpp
-  src/pcl_modified.cpp
+  # src/pcl_generic.cpp
+  # src/pcl_modified.cpp
   src/omp.cpp
+  src/omp_multi_voxel.cpp
 )
 
 target_include_directories(ndt
@@ -42,7 +43,7 @@ target_include_directories(ndt
     ${PCL_INCLUDE_DIRS}
 )
 
-ament_target_dependencies(ndt PUBLIC ndt_omp ndt_pcl_modified)
+ament_target_dependencies(ndt PUBLIC ndt_omp ndt_pcl_modified geometry_msgs tier4_autoware_utils)
 # Can't use ament_target_dependencies() here because it doesn't link PCL
 # properly, see ndt_omp for more information.
 target_compile_definitions(ndt PUBLIC ${PCL_DEFINITIONS})

@@ -26,10 +26,30 @@ NormalDistributionsTransformOMP<PointSource, PointTarget>::NormalDistributionsTr
 }
 
 template <class PointSource, class PointTarget>
-void NormalDistributionsTransformOMP<PointSource, PointTarget>::align(
-  pcl::PointCloud<PointSource> & output, const Eigen::Matrix4f & guess)
+NdtResult NormalDistributionsTransformOMP<PointSource, PointTarget>::align(
+  const geometry_msgs::msg::Pose & initial_pose_msg)
 {
-  ndt_ptr_->align(output, guess);
+  const Eigen::Matrix4f initial_pose_matrix =
+    tier4_autoware_utils::poseToMatrix4f(initial_pose_msg);
+
+  auto output_cloud = std::make_shared<pcl::PointCloud<PointSource>>();
+  ndt_ptr_->align(*output_cloud, initial_pose_matrix);
+
+  const std::vector<Eigen::Matrix4f, Eigen::aligned_allocator<Eigen::Matrix4f>>
+    transformation_array_matrix = getFinalTransformationArray();
+  std::vector<geometry_msgs::msg::Pose> transformation_array_msg;
+  for (auto pose_matrix : transformation_array_matrix) {
+    geometry_msgs::msg::Pose pose_ros = tier4_autoware_utils::matrix4fToPose(pose_matrix);
+    transformation_array_msg.push_back(pose_ros);
+  }
+
+  NdtResult ndt_result;
+  ndt_result.pose = tier4_autoware_utils::matrix4fToPose(getFinalTransformation());
+  ndt_result.transformation_array = transformation_array_msg;
+  ndt_result.transform_probability = getTransformationProbability();
+  ndt_result.nearest_voxel_transformation_likelihood = getNearestVoxelTransformationLikelihood();
+  ndt_result.iteration_num = getFinalNumIteration();
+  return ndt_result;
 }
 
 template <class PointSource, class PointTarget>
@@ -44,6 +64,30 @@ void NormalDistributionsTransformOMP<PointSource, PointTarget>::setInputSource(
   const pcl::shared_ptr<pcl::PointCloud<PointSource>> & scan_ptr)
 {
   ndt_ptr_->setInputSource(scan_ptr);
+}
+
+template <class PointSource, class PointTarget>
+void NormalDistributionsTransformOMP<PointSource, PointTarget>::setOMPParam(
+  const OMPParam & omp_param)
+{
+  setNumThreads(omp_param.num_threads);
+  setNeighborhoodSearchMethod(omp_param.search_method);
+}
+
+template <class PointSource, class PointTarget>
+typename NormalDistributionsTransformOMP<PointSource, PointTarget>::OMPParam
+  NormalDistributionsTransformOMP<PointSource, PointTarget>::getOMPParam()
+{
+  OMPParam omp_param;
+  omp_param.num_threads = getNumThreads();
+  omp_param.search_method = getNeighborhoodSearchMethod();
+  return omp_param;
+}
+
+template <class PointSource, class PointTarget>
+NDTImplementType NormalDistributionsTransformOMP<PointSource, PointTarget>::getImplementationType()
+{
+  return NDTImplementType::OMP;
 }
 
 template <class PointSource, class PointTarget>
@@ -162,6 +206,12 @@ void NormalDistributionsTransformOMP<PointSource, PointTarget>::setRegularizatio
   const float regularization_scale_factor)
 {
   ndt_ptr_->setRegularizationScaleFactor(regularization_scale_factor);
+}
+
+template <class PointSource, class PointTarget>
+float NormalDistributionsTransformOMP<PointSource, PointTarget>::getRegularizationScaleFactor()
+{
+  return ndt_ptr_->getRegularizationScaleFactor();
 }
 
 template <class PointSource, class PointTarget>
