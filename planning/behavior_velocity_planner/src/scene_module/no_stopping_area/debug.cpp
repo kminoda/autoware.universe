@@ -77,7 +77,7 @@ visualization_msgs::msg::MarkerArray createLaneletInfoMarkerArray(
     for (const auto & detection_area : no_stopping_area_reg_elem.noStoppingAreas()) {
       const auto poly = detection_area.basicPolygon();
 
-      marker.pose.position = toMsg(poly.front());
+      marker.pose.position = behavior_velocity_planner::toMsg(poly.front());
       marker.pose.position.z += 2.0;
       marker.text = std::to_string(no_stopping_area_reg_elem.id());
 
@@ -103,8 +103,8 @@ visualization_msgs::msg::MarkerArray createLaneletInfoMarkerArray(
         const auto & p_front = poly.at(idx_front);
         const auto & p_back = poly.at(idx_back);
 
-        marker.points.push_back(toMsg(p_front));
-        marker.points.push_back(toMsg(p_back));
+        marker.points.push_back(behavior_velocity_planner::toMsg(p_front));
+        marker.points.push_back(behavior_velocity_planner::toMsg(p_back));
       }
     }
     msg.markers.push_back(marker);
@@ -124,8 +124,8 @@ visualization_msgs::msg::MarkerArray createLaneletInfoMarkerArray(
       const auto poly = detection_area.basicPolygon();
       const auto centroid_point = getCentroidPoint(poly);
       for (size_t i = 0; i < poly.size(); ++i) {
-        marker.points.push_back(toMsg(centroid_point));
-        marker.points.push_back(toMsg(stop_line_center_point));
+        marker.points.push_back(behavior_velocity_planner::toMsg(centroid_point));
+        marker.points.push_back(behavior_velocity_planner::toMsg(stop_line_center_point));
       }
     }
     msg.markers.push_back(marker);
