@@ -41,17 +41,17 @@ def launch_setup(context, *args, **kwargs):
     with open(pointcloud_map_loader_param_path, "r") as f:
         pointcloud_map_loader_param = yaml.safe_load(f)["/**"]["ros__parameters"]
 
-    map_hash_generator = Node(
-        package="map_loader",
-        executable="map_hash_generator",
-        name="map_hash_generator",
-        parameters=[
-            {
-                "lanelet2_map_path": LaunchConfiguration("lanelet2_map_path"),
-                "pointcloud_map_path": LaunchConfiguration("pointcloud_map_path"),
-            }
-        ],
-    )
+    # map_hash_generator = Node(
+    #     package="map_loader",
+    #     executable="map_hash_generator",
+    #     name="map_hash_generator",
+    #     parameters=[
+    #         {
+    #             "lanelet2_map_path": LaunchConfiguration("lanelet2_map_path"),
+    #             "pointcloud_map_path": LaunchConfiguration("pointcloud_map_path"),
+    #         }
+    #     ],
+    # )
 
     lanelet2_map_loader = ComposableNode(
         package="map_loader",
@@ -126,7 +126,7 @@ def launch_setup(context, *args, **kwargs):
         [
             PushRosNamespace("map"),
             container,
-            map_hash_generator,
+            # map_hash_generator,
         ]
     )
 

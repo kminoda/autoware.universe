@@ -9,6 +9,7 @@
     <remap from="ndt_align_srv" to="/localization/pose_estimator/ndt_align_srv"/>
     <remap from="service/initialize_pose" to="/localization/util/initialize_pose"/>
     <remap from="service/initialize_pose_auto" to="/localization/util/initialize_pose_auto"/>
+    <remap from="pcd_loader_service" to="/map/get_partial_pointcloud_map"/>
 
     <param from="$(var config_file)"/>
     <param name="enable_gnss_callback" value="true"/>

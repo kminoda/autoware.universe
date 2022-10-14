@@ -51,6 +51,7 @@ PoseInitializer::PoseInitializer()
 : Node("pose_initializer"), tf2_listener_(tf2_buffer_), map_frame_("map")
 {
   enable_gnss_callback_ = this->declare_parameter("enable_gnss_callback", true);
+  radius_to_load_map_ = this->declare_parameter("radius_to_load_map", 300.0);
 
   const std::vector<double> initialpose_particle_covariance =
     this->declare_parameter<std::vector<double>>("initialpose_particle_covariance");
@@ -72,9 +73,12 @@ PoseInitializer::PoseInitializer()
   initial_pose_sub_ = this->create_subscription<geometry_msgs::msg::PoseWithCovarianceStamped>(
     "initialpose", 10,
     std::bind(&PoseInitializer::callbackInitialPose, this, std::placeholders::_1));
-  map_points_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
-    "pointcloud_map", rclcpp::QoS{1}.transient_local(),
-    std::bind(&PoseInitializer::callbackMapPoints, this, std::placeholders::_1));
+  // map_points_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
+  //   "pointcloud_map", rclcpp::QoS{1}.transient_local(),
+  //   std::bind(&PoseInitializer::callbackMapPoints, this, std::placeholders::_1));
+  // map_points_sub_ = this->create_subscription<autoware_map_msgs::msg::PCDMapArray>(
+  //   "pointcloud_map", rclcpp::QoS{1},
+  //   std::bind(&PoseInitializer::callbackMapPoints, this, std::placeholders::_1));
   gnss_pose_sub_ = this->create_subscription<geometry_msgs::msg::PoseWithCovarianceStamped>(
     "gnss_pose_cov", 1,
     std::bind(&PoseInitializer::callbackGNSSPoseCov, this, std::placeholders::_1));
@@ -94,6 +98,19 @@ PoseInitializer::PoseInitializer()
     RCLCPP_INFO(get_logger(), "Waiting for service...");
   }
 
+  // pcd_loader_service_group_ = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  // pcd_loader_client_ = this->create_client<autoware_map_msgs::srv::LoadPCDPartiallyForPublish>(
+  //   "pcd_loader_service", rmw_qos_profile_services_default, pcd_loader_service_group_);
+  // while (!pcd_loader_client_->wait_for_service(std::chrono::seconds(1)) && rclcpp::ok()) {
+  //   RCLCPP_INFO(get_logger(), "Waiting for pcd loader service...");
+  // }
+  pcd_loader_service_group_ = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  pcd_loader_client_ = this->create_client<autoware_map_msgs::srv::GetPartialPointCloudMap>(
+    "pcd_loader_service", rmw_qos_profile_services_default, pcd_loader_service_group_);
+  while (!pcd_loader_client_->wait_for_service(std::chrono::seconds(1)) && rclcpp::ok()) {
+    RCLCPP_INFO(get_logger(), "Waiting for pcd loader service...");
+  }
+
   initialize_pose_service_ =
     this->create_service<tier4_localization_msgs::srv::PoseWithCovarianceStamped>(
       "service/initialize_pose", std::bind(
@@ -105,15 +122,39 @@ PoseInitializer::PoseInitializer()
       "service/initialize_pose_auto", std::bind(
                                         &PoseInitializer::serviceInitializePoseAuto, this,
                                         std::placeholders::_1, std::placeholders::_2));
+
+  map_ptr_ = nullptr;
 }
 
-void PoseInitializer::callbackMapPoints(
-  sensor_msgs::msg::PointCloud2::ConstSharedPtr map_points_msg_ptr)
-{
-  std::string map_frame_ = map_points_msg_ptr->header.frame_id;
-  map_ptr_ = pcl::PointCloud<pcl::PointXYZ>::Ptr(new pcl::PointCloud<pcl::PointXYZ>);
-  pcl::fromROSMsg(*map_points_msg_ptr, *map_ptr_);
-}
+// void PoseInitializer::callbackMapPoints(
+//   sensor_msgs::msg::PointCloud2::ConstSharedPtr map_points_msg_ptr)
+// {
+//   std::string map_frame_ = map_points_msg_ptr->header.frame_id;
+//   map_ptr_ = pcl::PointCloud<pcl::PointXYZ>::Ptr(new pcl::PointCloud<pcl::PointXYZ>);
+//   pcl::fromROSMsg(*map_points_msg_ptr, *map_ptr_);
+// }
+
+// void PoseInitializer::callbackMapPoints(
+//   autoware_map_msgs::msg::PCDMapArray::ConstSharedPtr map_points_msg_ptr)
+// {
+//   if (map_ptr_ != nullptr) {return;} // TODO: koji minoda
+
+//   RCLCPP_INFO(this->get_logger(), "Received a map! size: %d", int(map_points_msg_ptr->pcd_maps.size()));
+//   std::string map_frame_ = map_points_msg_ptr->pcd_maps[0].pcd_map.header.frame_id;
+//   sensor_msgs::msg::PointCloud2 pcd_msg;
+//   for (const auto & pcd_info : map_points_msg_ptr->pcd_maps) {
+//     if (pcd_msg.width == 0) {
+//       pcd_msg = pcd_info.pcd_map;
+//     } else {
+//       pcd_msg.width += pcd_info.pcd_map.width;
+//       pcd_msg.row_step += pcd_info.pcd_map.row_step;
+//       pcd_msg.data.insert(pcd_msg.data.end(),
+//         pcd_info.pcd_map.data.begin(), pcd_info.pcd_map.data.end());
+//     }
+//   }
+//   map_ptr_ = pcl::PointCloud<pcl::PointXYZ>::Ptr(new pcl::PointCloud<pcl::PointXYZ>);
+//   pcl::fromROSMsg(pcd_msg, *map_ptr_);
+// }
 
 void PoseInitializer::serviceInitializePose(
   const tier4_localization_msgs::srv::PoseWithCovarianceStamped::Request::SharedPtr req,
@@ -129,17 +170,64 @@ void PoseInitializer::serviceInitializePose(
   res->success = callAlignServiceAndPublishResult(add_height_pose_msg_ptr);
 }
 
+void PoseInitializer::callPCDLoader(geometry_msgs::msg::Point position, double radius)
+{
+  // send a request
+  auto request = std::make_shared<autoware_map_msgs::srv::GetPartialPointCloudMap::Request>();
+  request->area.center = position;
+  request->area.radius = radius;
+  auto result{pcd_loader_client_->async_send_request(
+    request,
+    [this](const rclcpp::Client<autoware_map_msgs::srv::GetPartialPointCloudMap>::SharedFuture
+             response) {
+      (void)response;
+      std::lock_guard<std::mutex> lock{mutex_};
+      value_ready_ = true;
+      condition_.notify_all();
+    })};
+  std::unique_lock<std::mutex> lock{mutex_};
+  condition_.wait(lock, [this]() { return value_ready_; });
+
+  // process the response from map_loader
+  std::cout << "Loaded grids: " << result.get()->new_pointcloud_with_ids.size() << std::endl;
+  sensor_msgs::msg::PointCloud2 pcd_msg;
+  for (const auto & pcd_with_id : result.get()->new_pointcloud_with_ids) {
+    if (pcd_msg.width == 0) {
+      pcd_msg = pcd_with_id.pointcloud;
+    } else {
+      pcd_msg.width += pcd_with_id.pointcloud.width;
+      pcd_msg.row_step += pcd_with_id.pointcloud.row_step;
+      pcd_msg.data.insert(pcd_msg.data.end(),
+        pcd_with_id.pointcloud.data.begin(), pcd_with_id.pointcloud.data.end());
+    }
+  }
+  map_ptr_ = pcl::PointCloud<pcl::PointXYZ>::Ptr(new pcl::PointCloud<pcl::PointXYZ>);
+  pcl::fromROSMsg(pcd_msg, *map_ptr_);
+}
+
 void PoseInitializer::callbackInitialPose(
   geometry_msgs::msg::PoseWithCovarianceStamped::ConstSharedPtr pose_cov_msg_ptr)
 {
   enable_gnss_callback_ = false;  // get only first topic
 
+  callPCDLoader(pose_cov_msg_ptr->pose.pose.position, radius_to_load_map_);
+
   auto add_height_pose_msg_ptr = std::make_shared<geometry_msgs::msg::PoseWithCovarianceStamped>();
   getHeight(*pose_cov_msg_ptr, add_height_pose_msg_ptr);
+
+  try {
+    const auto stamped = tf2_buffer_.lookupTransform(
+      map_frame_, add_height_pose_msg_ptr->header.frame_id, tf2::TimePointZero);
+    tf2::doTransform(*add_height_pose_msg_ptr, *add_height_pose_msg_ptr, stamped);
+  } catch (tf2::TransformException & exception) {
+    RCLCPP_WARN_STREAM(get_logger(), "failed to lookup transform: " << exception.what());
+  }
 
   add_height_pose_msg_ptr->pose.covariance = initialpose_particle_covariance_;
 
   callAlignServiceAndPublishResult(add_height_pose_msg_ptr);
+
+  value_ready_ = false;
 }
 
 // NOTE Still not usable callback
@@ -150,14 +238,26 @@ void PoseInitializer::callbackGNSSPoseCov(
     return;
   }
 
+  callPCDLoader(pose_cov_msg_ptr->pose.pose.position, radius_to_load_map_);
+
   // TODO(YamatoAndo) check service is available
 
   auto add_height_pose_msg_ptr = std::make_shared<geometry_msgs::msg::PoseWithCovarianceStamped>();
   getHeight(*pose_cov_msg_ptr, add_height_pose_msg_ptr);
 
+  try {
+    const auto stamped = tf2_buffer_.lookupTransform(
+      map_frame_, add_height_pose_msg_ptr->header.frame_id, tf2::TimePointZero);
+    tf2::doTransform(*add_height_pose_msg_ptr, *add_height_pose_msg_ptr, stamped);
+  } catch (tf2::TransformException & exception) {
+    RCLCPP_WARN_STREAM(get_logger(), "failed to lookup transform: " << exception.what());
+  }
+
   add_height_pose_msg_ptr->pose.covariance = gnss_particle_covariance_;
 
   callAlignServiceAndPublishResult(add_height_pose_msg_ptr);
+
+  value_ready_ = false;
 }
 
 void PoseInitializer::serviceInitializePoseAuto(
