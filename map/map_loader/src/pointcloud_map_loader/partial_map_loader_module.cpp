@@ -50,6 +50,7 @@ bool PartialMapLoaderModule::onServiceGetPartialPointCloudMap(
 {
   auto area = req->area;
   partialAreaLoad(area, res);
+  res->frame_id = "map";
   return true;
 }
 

@@ -71,6 +71,7 @@ bool DifferentialMapLoaderModule::onServiceGetDifferentialPointCloudMap(
   auto area = req->area;
   std::vector<std::string> cached_ids = req->cached_ids;
   differentialAreaLoad(area, cached_ids, res);
+  res->frame_id = "map";
   return true;
 }
 

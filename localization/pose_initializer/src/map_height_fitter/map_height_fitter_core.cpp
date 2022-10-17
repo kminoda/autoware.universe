@@ -14,8 +14,6 @@
 
 #include "map_height_fitter_core.hpp"
 
-#include <pcl_conversions/pcl_conversions.h>
-
 #ifdef ROS_DISTRO_GALACTIC
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 #else
@@ -26,21 +24,15 @@
 
 MapHeightFitter::MapHeightFitter() : Node("map_height_fitter"), tf2_listener_(tf2_buffer_)
 {
-  const auto durable_qos = rclcpp::QoS(1).transient_local();
+  partial_map_load_enabled_ = declare_parameter<bool>("partial_map_load_enabled");
+
   using std::placeholders::_1;
   using std::placeholders::_2;
 
-  sub_map_ = create_subscription<sensor_msgs::msg::PointCloud2>(
-    "pointcloud_map", durable_qos, std::bind(&MapHeightFitter::on_map, this, _1));
   srv_fit_ = create_service<RequestHeightFitting>(
     "fit_map_height", std::bind(&MapHeightFitter::on_fit, this, _1, _2));
-}
 
-void MapHeightFitter::on_map(const sensor_msgs::msg::PointCloud2::ConstSharedPtr msg)
-{
-  map_frame_ = msg->header.frame_id;
-  map_cloud_ = pcl::PointCloud<pcl::PointXYZ>::Ptr(new pcl::PointCloud<pcl::PointXYZ>);
-  pcl::fromROSMsg(*msg, *map_cloud_);
+  map_module_ = std::make_unique<MapModule>(this, partial_map_load_enabled_);
 }
 
 double MapHeightFitter::get_ground_height(const tf2::Vector3 & point) const
@@ -50,7 +42,7 @@ double MapHeightFitter::get_ground_height(const tf2::Vector3 & point) const
   const double y = point.getY();
 
   double height = INFINITY;
-  for (const auto & p : map_cloud_->points) {
+  for (const auto & p : map_module_->get_map_ptr()->points) {
     const double dx = x - p.x;
     const double dy = y - p.y;
     const double sd = (dx * dx) + (dy * dy);
@@ -70,9 +62,14 @@ void MapHeightFitter::on_fit(
   std::string req_frame = req->pose_with_covariance.header.frame_id;
   res->success = false;
 
-  if (map_cloud_) {
+  if (partial_map_load_enabled_) {
+    map_module_->get_partial_point_cloud_map(req->pose_with_covariance.pose.pose.position);
+  }
+
+
+  if (map_module_->get_map_ptr()) {
     try {
-      const auto stamped = tf2_buffer_.lookupTransform(map_frame_, req_frame, tf2::TimePointZero);
+      const auto stamped = tf2_buffer_.lookupTransform(map_module_->get_map_frame(), req_frame, tf2::TimePointZero);
       tf2::Transform transform{tf2::Quaternion{}, tf2::Vector3{}};
       tf2::fromMsg(stamped.transform, transform);
       point = transform * point;

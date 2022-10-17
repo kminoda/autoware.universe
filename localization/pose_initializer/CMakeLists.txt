@@ -17,6 +17,7 @@ ament_auto_add_executable(pose_initializer_node
 ament_auto_add_executable(map_height_fitter
   src/map_height_fitter/map_height_fitter_node.cpp
   src/map_height_fitter/map_height_fitter_core.cpp
+  src/map_height_fitter/map_module.cpp
 )
 target_link_libraries(map_height_fitter ${PCL_LIBRARIES})
 

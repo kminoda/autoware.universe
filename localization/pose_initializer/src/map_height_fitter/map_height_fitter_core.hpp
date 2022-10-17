@@ -15,14 +15,13 @@
 #ifndef MAP_HEIGHT_FITTER__MAP_HEIGHT_FITTER_CORE_HPP_
 #define MAP_HEIGHT_FITTER__MAP_HEIGHT_FITTER_CORE_HPP_
 
+#include "map_module.hpp"
+
 #include <rclcpp/rclcpp.hpp>
 
 #include <geometry_msgs/msg/pose_with_covariance_stamped.hpp>
-#include <sensor_msgs/msg/point_cloud2.hpp>
 #include <tier4_localization_msgs/srv/pose_with_covariance_stamped.hpp>
 
-#include <pcl/point_cloud.h>
-#include <pcl/point_types.h>
 #include <tf2_ros/transform_listener.h>
 
 #include <string>
@@ -37,12 +36,12 @@ private:
   using RequestHeightFitting = tier4_localization_msgs::srv::PoseWithCovarianceStamped;
   tf2::BufferCore tf2_buffer_;
   tf2_ros::TransformListener tf2_listener_;
-  std::string map_frame_;
-  pcl::PointCloud<pcl::PointXYZ>::Ptr map_cloud_;
-  rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr sub_map_;
   rclcpp::Service<RequestHeightFitting>::SharedPtr srv_fit_;
 
-  void on_map(const sensor_msgs::msg::PointCloud2::ConstSharedPtr msg);
+  bool partial_map_load_enabled_;
+
+  std::unique_ptr<MapModule> map_module_;
+
   void on_fit(
     const RequestHeightFitting::Request::SharedPtr req,
     const RequestHeightFitting::Response::SharedPtr res) const;
