@@ -26,7 +26,8 @@ jobs:
       run: |
         files=$(cat changed_files.txt | grep '\.cpp$\|\.h$' | tr '\n' ' ')
         if [ -n "$files" ]; then
-          cppcheck --enable=warning,style,performance --error-exitcode=1 $files
+          cppcheck --enable=warning,style,performance --error-exitcode=1 --xml $files 2> cppcheck-report.xml
+          cppcheck-htmlreport --file=cppcheck-report.xml --report-dir=cppcheck-html
         else
           echo "No C++ files changed."
         fi
