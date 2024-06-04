@@ -11,10 +11,10 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v2
 
-    - name: Install Cppcheck and htmlreport
+    - name: Install Cppcheck
       run: |
         sudo apt-get update
-        sudo apt-get install -y cppcheck python3-lxml
+        sudo apt-get install -y cppcheck
 
     - name: Get changed files
       id: changed-files
@@ -28,31 +28,7 @@ jobs:
         files=$(cat changed_files.txt | grep '\.cpp$\|\.h$' | tr '\n' ' ')
         if [ -n "$files" ]; then
           cppcheck --enable=warning,style,performance --error-exitcode=1 --xml $files 2> cppcheck-report.xml
-          cppcheck-htmlreport --file=cppcheck-report.xml --report-dir=cppcheck-html
         else
           echo "No C++ files changed."
         fi
       shell: bash
-
-    - name: Upload Cppcheck HTML Report
-      if: failure()
-      uses: actions/upload-artifact@v2
-      with:
-        name: cppcheck-html-report
-        path: cppcheck-html
-
-    - name: Post results as comment
-      if: failure() && ${{ github.event_name == 'pull_request' }}
-      uses: actions/github-script@v6
-      with:
-        script: |
-          const fs = require('fs');
-          const path = 'cppcheck-html/index.html';
-          const htmlReport = fs.readFileSync(path, { encoding: 'utf8' });
-          const comment = `Cppcheck Analysis:\n\n${htmlReport}`;
-          github.rest.issues.createComment({
-            issue_number: context.issue.number,
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            body: comment
-          });
