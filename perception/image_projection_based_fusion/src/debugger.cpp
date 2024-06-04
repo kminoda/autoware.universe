@@ -20,6 +20,8 @@
 #include <cv_bridge/cv_bridge.h>
 #endif
 
+int hoge = 1;
+void(hoge);
 namespace
 {
 
