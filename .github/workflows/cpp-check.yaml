@@ -19,7 +19,7 @@ jobs:
       run: |
         git status
         git fetch origin ${{ github.base_ref }} --depth=1
-        git diff --name-only origin/${{ github.base_ref }} ${{ github.head_ref }} > changed_files.txt
+        git diff --name-only FETCH_HEAD ${{ github.sha }} > changed_files.txt
         cat changed_files.txt
 
     - name: Run Cppcheck on changed files
