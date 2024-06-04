@@ -29,4 +29,5 @@ jobs:
           cppcheck --enable=warning,style,performance --error-exitcode=1 $files
         else
           echo "No C++ files changed."
+        fi
       shell: bash
