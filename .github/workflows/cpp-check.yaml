@@ -11,13 +11,14 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v2
 
-    - name: Install Cppcheck
-      run: sudo apt-get install -y cppcheck
+    - name: Install Cppcheck and htmlreport
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cppcheck python3-lxml
 
     - name: Get changed files
       id: changed-files
       run: |
-        git status
         git fetch origin ${{ github.base_ref }} --depth=1
         git diff --name-only FETCH_HEAD ${{ github.sha }} > changed_files.txt
         cat changed_files.txt
