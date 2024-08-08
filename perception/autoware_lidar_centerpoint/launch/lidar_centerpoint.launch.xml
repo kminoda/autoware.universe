@@ -28,7 +28,7 @@
     </load_composable_node>
   </group>
   <group unless="$(var use_pointcloud_container)">
-    <node pkg="autoware_lidar_centerpoint" exec="autoware_lidar_centerpoint_node" name="lidar_centerpoint" output="screen">
+    <node pkg="autoware_lidar_centerpoint" exec="autoware_lidar_centerpoint_node" name="lidar_centerpoint" output="both">
       <remap from="~/input/pointcloud" to="$(var input/pointcloud)"/>
       <remap from="~/output/objects" to="$(var output/objects)"/>
       <param from="$(var model_param_path)" allow_substs="true"/>
