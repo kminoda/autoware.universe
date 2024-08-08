@@ -5,7 +5,7 @@
   <arg name="output/short_range_object" default="short_range_object"/>
   <arg name="param_path" default="$(find-pkg-share autoware_object_range_splitter)/config/object_range_splitter.param.yaml"/>
 
-  <node pkg="autoware_object_range_splitter" exec="object_range_splitter_node" name="object_range_splitter" output="screen">
+  <node pkg="autoware_object_range_splitter" exec="object_range_splitter_node" name="object_range_splitter" output="both">
     <remap from="input/object" to="$(var input/object)"/>
     <remap from="output/long_range_object" to="$(var output/long_range_object)"/>
     <remap from="output/short_range_object" to="$(var output/short_range_object)"/>
