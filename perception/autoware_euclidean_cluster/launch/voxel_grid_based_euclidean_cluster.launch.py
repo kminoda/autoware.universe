@@ -76,7 +76,7 @@ def launch_setup(context, *args, **kwargs):
         namespace=ns,
         executable="component_container",
         composable_node_descriptions=[],
-        output="screen",
+        output="both",
         condition=UnlessCondition(LaunchConfiguration("use_pointcloud_container")),
     )
 
