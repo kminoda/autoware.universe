@@ -5,7 +5,7 @@
   <!-- Parameter -->
   <arg name="config_file" default="$(find-pkg-share autoware_shape_estimation)/config/shape_estimation.param.yaml"/>
 
-  <node pkg="autoware_shape_estimation" exec="shape_estimation_node" name="$(var node_name)" output="screen">
+  <node pkg="autoware_shape_estimation" exec="shape_estimation_node" name="$(var node_name)" output="both">
     <remap from="input" to="$(var input/objects)"/>
     <remap from="objects" to="$(var output/objects)"/>
     <param from="$(var config_file)"/>
