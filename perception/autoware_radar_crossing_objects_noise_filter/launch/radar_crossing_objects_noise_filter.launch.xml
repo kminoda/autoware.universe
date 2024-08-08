@@ -8,7 +8,7 @@
   <arg name="param_path" default="$(find-pkg-share autoware_radar_crossing_objects_noise_filter)/config/radar_crossing_objects_noise_filter.param.yaml"/>
 
   <!-- Node -->
-  <node pkg="autoware_radar_crossing_objects_noise_filter" exec="radar_crossing_objects_noise_filter_node" name="radar_crossing_objects_noise_filter" output="screen">
+  <node pkg="autoware_radar_crossing_objects_noise_filter" exec="radar_crossing_objects_noise_filter_node" name="radar_crossing_objects_noise_filter" output="both">
     <remap from="~/input/objects" to="$(var input/objects)"/>
     <remap from="~/output/noise_objects" to="$(var output/noise_objects)"/>
     <remap from="~/output/filtered_objects" to="$(var output/filtered_objects)"/>
