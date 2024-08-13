@@ -134,7 +134,7 @@ bool LidarApolloInstanceSegmentation::detectDynamicObjects(
 
   // convert from ros to pcl
   pcl::PointCloud<pcl::PointXYZI>::Ptr pcl_pointcloud_raw_ptr(new pcl::PointCloud<pcl::PointXYZI>);
-  // pcl::fromROSMsg(transformed_cloud, *pcl_pointcloud_raw_ptr);
+  pcl::fromROSMsg(transformed_cloud, *pcl_pointcloud_raw_ptr);
 
   auto pcl_pointcloud_raw = *pcl_pointcloud_raw_ptr;
   pcl_pointcloud_raw.width = transformed_cloud.width;
